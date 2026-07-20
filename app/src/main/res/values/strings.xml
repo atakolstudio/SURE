@@ -1,0 +1,21 @@
+<resources>
+    <string name="app_name">SURE</string>
+    <string name="app_tagline">Tüm cihazların tek kumandası</string>
+
+    <string name="nav_devices">Cihazlarım</string>
+    <string name="add_device">Yeni Cihaz Ekle</string>
+    <string name="empty_devices_title">Henüz cihaz eklemediniz</string>
+    <string name="empty_devices_subtitle">Başlamak için sağ alttaki + düğmesine dokunun</string>
+
+    <string name="find_your_brand">Markanızı Bulun</string>
+    <string name="select_device_type">Cihaz Türünü Seçin</string>
+    <string name="select_connection_type">Bağlantı Türünü Seçin</string>
+
+    <string name="rename_device">Cihazı Yeniden Adlandır</string>
+    <string name="edit_custom_panel">Özel Panoyu Düzenle</string>
+    <string name="delete_device">Cihazı Sil</string>
+    <string name="device_info">Cihaz Bilgileri</string>
+
+    <string name="ir_not_supported">Bu cihazda kızılötesi (IR) verici bulunmuyor. WiFi/akıllı cihaz desteği ile devam edebilirsiniz.</string>
+    <string name="signal_sent">Sinyal gönderildi</string>
+</resources>

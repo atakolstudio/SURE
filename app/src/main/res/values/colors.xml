@@ -1,0 +1,6 @@
+<resources>
+    <color name="sure_primary">#3D5AFE</color>
+    <color name="sure_error">#E53935</color>
+    <color name="sure_background_dark">#10131A</color>
+    <color name="sure_background_light">#F5F6FA</color>
+</resources>
