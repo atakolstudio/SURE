@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
-"""CI yardımcı betiği: build_output.log dosyasının son kısmını gizli bir Gist'e yükler.
-Sadece build başarısız olduğunda, tanılama amacıyla çalıştırılır.
+"""CI yardimci betigi: build_output.log dosyasinin son kismini, ilgili commit'e
+yorum olarak ekler. Sadece build basarisiz oldugunda, tanilama amaciyla calisir.
+Gist yerine commit comment kullanilir cunku kullanilan token'da 'gist' yetkisi yoktur;
+commit comment icin standart 'repo' yetkisi yeterlidir.
 """
 import json
 import os
@@ -14,12 +16,15 @@ MAX_CHARS = 55000
 
 def main() -> int:
     token = os.environ.get("GIST_TOKEN")
-    if not token:
-        print("HATA: GIST_TOKEN ortam değişkeni bulunamadı.")
+    repo = os.environ.get("GITHUB_REPOSITORY")
+    sha = os.environ.get("GITHUB_SHA")
+
+    if not token or not repo or not sha:
+        print("HATA: Gerekli ortam degiskenleri eksik.")
         return 1
 
     if not os.path.exists(LOG_PATH):
-        print(f"HATA: {LOG_PATH} bulunamadı.")
+        print(f"HATA: {LOG_PATH} bulunamadi.")
         return 1
 
     with open(LOG_PATH, "r", errors="replace") as f:
@@ -28,14 +33,12 @@ def main() -> int:
     if len(content) > MAX_CHARS:
         content = content[-MAX_CHARS:]
 
-    payload = json.dumps({
-        "description": "SURE build failure log",
-        "public": False,
-        "files": {"build_output.log": {"content": content}}
-    }).encode("utf-8")
+    body = "## Otomatik CI Hata Raporu\n\n```\n" + content + "\n```"
+    payload = json.dumps({"body": body}).encode("utf-8")
 
+    url = f"https://api.github.com/repos/{repo}/commits/{sha}/comments"
     req = urllib.request.Request(
-        "https://api.github.com/gists",
+        url,
         data=payload,
         method="POST",
         headers={
@@ -49,11 +52,10 @@ def main() -> int:
     try:
         with urllib.request.urlopen(req) as resp:
             result = json.loads(resp.read().decode("utf-8"))
-            print("GIST_URL:", result["html_url"])
-            print("GIST_ID:", result["id"])
+            print("COMMENT_URL:", result["html_url"])
             return 0
     except urllib.error.HTTPError as e:
-        print("GIST OLUŞTURMA HATASI, HTTP", e.code)
+        print("YORUM HATASI, HTTP", e.code)
         print(e.read().decode("utf-8", errors="replace"))
         return 1
     except Exception as e:
