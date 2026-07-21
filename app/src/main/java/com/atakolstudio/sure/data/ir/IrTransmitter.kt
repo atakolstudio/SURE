@@ -15,9 +15,9 @@ sealed class IrTransmitResult {
 }
 
 /**
- * `ConsumerIrManager` üzerinden gerçek kızılötesi sinyal gönderimini yönetir.
- * Cihazda IR donanımı yoksa (`hasIrEmitter() == false`), bunu zarifçe raporlar;
- * uygulama çökmez.
+ * `ConsumerIrManager` uzerinden gercek kizilotesi sinyal gonderimini yonetir.
+ * Cihazda IR donanimi yoksa (`hasIrEmitter() == false`), bunu zarifce raporlar;
+ * uygulama cokmez.
  */
 @Singleton
 class IrTransmitter @Inject constructor(
@@ -29,21 +29,30 @@ class IrTransmitter @Inject constructor(
     val hasIrEmitter: Boolean
         get() = irManager?.hasIrEmitter() == true
 
+    /** Bilinen bir marka + tus kombinasyonunu gonderir. */
     fun send(brand: BrandIrCodeSet, button: RemoteButton): IrTransmitResult {
+        val irCommand = BrandIrDatabase.toIrCommand(brand, button)
+            ?: return IrTransmitResult.ButtonNotMapped
+        return sendRaw(irCommand)
+    }
+
+    /**
+     * Ham bir IR komutunu (protokol + adres + komut) dogrudan gonderir.
+     * "Manuel Bul" (kod tarama / elle kod girme) akislari bunu kullanir; henuz
+     * bir markaya/tusa baglanmamis, test amacli komutlar icin idealdir.
+     */
+    fun sendRaw(command: IrCommand): IrTransmitResult {
         val manager = irManager ?: return IrTransmitResult.NoIrHardware
         if (!manager.hasIrEmitter()) return IrTransmitResult.NoIrHardware
 
-        val irCommand = BrandIrDatabase.toIrCommand(brand, button)
-            ?: return IrTransmitResult.ButtonNotMapped
-
         return try {
-            val pattern = IrCodeEncoder.encode(irCommand)
-            manager.transmit(brand.protocol.carrierFrequencyHz, pattern)
+            val pattern = IrCodeEncoder.encode(command)
+            manager.transmit(command.protocol.carrierFrequencyHz, pattern)
             IrTransmitResult.Success
         } catch (e: UnsupportedOperationException) {
             IrTransmitResult.FrequencyNotSupported
         } catch (e: Exception) {
-            IrTransmitResult.Error(e.message ?: "Bilinmeyen IR gönderim hatası")
+            IrTransmitResult.Error(e.message ?: "Bilinmeyen IR gonderim hatasi")
         }
     }
 }

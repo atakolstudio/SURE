@@ -123,6 +123,23 @@ BrandIrCodeSet(
 
 4. `verified = true` yaparak arayüzdeki "Doğrulanmamış" etiketini kaldırın.
 
+## Markası Bilinmeyen Cihazlar İçin "Manuel Bul"
+
+Marka listesinde cihazınızı bulamıyorsanız veya markanız var ama kodu çalışmıyorsa,
+Marka Seçimi ekranındaki **"Markamı Bilmiyorum"** kartına dokunun. İki yöntem sunulur:
+
+1. **Kod Tarama**: Uygulama, veritabanındaki markaları sırayla dener (klasik evrensel
+   kumanda "brand hunt" yöntemi). Her denemede TEST butonuna basıp cihazınızın tepki
+   verip vermediğini kontrol edersiniz; tepki verirse o kodu kaydedersiniz.
+2. **Elle Kod Gir**: Bir IR alıcı/analiz uygulamasıyla orijinal kumandanızın protokolünü,
+   adresini ve komut baytını okuduysanız, bunları doğrudan girip test edebilir ve
+   çalışırsa cihaz olarak kaydedebilirsiniz. NEC protokolünde, bulunan adresle diğer
+   tuşlar (ses, kanal, D-pad) için de otomatik bir şablon uygulanır; diğer protokollerde
+   şimdilik yalnızca test edilen (genelde Güç) tuşu kaydedilir.
+
+Bu şekilde kaydedilen "özel" cihazlar, `SavedDeviceEntity` içinde `brandKey = "custom"`
+ile ve kendi protokol/adres/komut bilgileriyle saklanır (bkz. `data/ir/SavedDeviceIrMapper.kt`).
+
 ## İzinler
 
 | İzin | Amaç |

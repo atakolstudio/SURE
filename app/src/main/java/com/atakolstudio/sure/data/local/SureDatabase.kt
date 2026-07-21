@@ -7,7 +7,7 @@ import com.atakolstudio.sure.data.local.entity.SavedDeviceEntity
 
 @Database(
     entities = [SavedDeviceEntity::class],
-    version = 1,
+    version = 2,
     exportSchema = true
 )
 abstract class SureDatabase : RoomDatabase() {

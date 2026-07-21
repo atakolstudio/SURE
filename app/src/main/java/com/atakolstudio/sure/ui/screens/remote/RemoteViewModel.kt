@@ -8,6 +8,7 @@ import com.atakolstudio.sure.data.ir.BrandIrDatabase
 import com.atakolstudio.sure.data.ir.IrTransmitResult
 import com.atakolstudio.sure.data.ir.IrTransmitter
 import com.atakolstudio.sure.data.ir.RemoteButton
+import com.atakolstudio.sure.data.ir.resolveBrandIrCodeSet
 import com.atakolstudio.sure.data.local.entity.SavedDeviceEntity
 import com.atakolstudio.sure.data.repository.DeviceRepository
 import com.atakolstudio.sure.domain.model.ConnectionType
@@ -66,7 +67,7 @@ class RemoteViewModel @Inject constructor(
                 isLoading = false,
                 savedDeviceId = entity.id,
                 nickname = entity.nickname,
-                brand = BrandIrDatabase.findByKey(entity.brandKey),
+                brand = entity.resolveBrandIrCodeSet(),
                 deviceType = runCatching { DeviceType.valueOf(entity.deviceType) }.getOrDefault(DeviceType.TV),
                 connectionType = runCatching { ConnectionType.valueOf(entity.connectionType) }.getOrDefault(ConnectionType.TRADITIONAL_IR)
             )

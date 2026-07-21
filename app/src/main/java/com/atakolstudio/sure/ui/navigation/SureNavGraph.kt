@@ -10,6 +10,7 @@ import com.atakolstudio.sure.ui.screens.brand.BrandSelectionScreen
 import com.atakolstudio.sure.ui.screens.connectiontype.ConnectionTypeSelectionScreen
 import com.atakolstudio.sure.ui.screens.devices.DevicesScreen
 import com.atakolstudio.sure.ui.screens.devicetype.DeviceTypeSelectionScreen
+import com.atakolstudio.sure.ui.screens.manualsearch.ManualSearchScreen
 import com.atakolstudio.sure.ui.screens.remote.RemoteScreen
 
 @Composable
@@ -69,7 +70,30 @@ fun SureNavGraph() {
                         popUpTo(SureDestination.Devices.route)
                     }
                 },
+                onManualSearchClick = {
+                    navController.navigate(SureDestination.ManualSearch.createRoute(deviceType, connectionType))
+                },
                 onBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(
+            route = SureDestination.ManualSearch.route,
+            arguments = listOf(
+                navArgument("deviceType") { type = NavType.StringType },
+                navArgument("connectionType") { type = NavType.StringType }
+            )
+        ) {
+            ManualSearchScreen(
+                onBack = { navController.popBackStack() },
+                onDeviceSaved = { savedDeviceId ->
+                    navController.navigate(
+                        SureDestination.Remote.createRouteForSavedDevice(savedDeviceId)
+                    ) {
+                        // Kurulum akışı ekranlarını (marka/tür/bağlantı seçimi) geri yığınından temizle
+                        popUpTo(SureDestination.Devices.route)
+                    }
+                }
             )
         }
 

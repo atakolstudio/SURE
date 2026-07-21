@@ -15,6 +15,11 @@ sealed class SureDestination(val route: String) {
 
     object DeviceTypeSelection : SureDestination("device_type_selection")
 
+    object ManualSearch : SureDestination("manual_search/{deviceType}/{connectionType}") {
+        fun createRoute(deviceType: String, connectionType: String) =
+            "manual_search/$deviceType/$connectionType"
+    }
+
     object ConnectionTypeSelection : SureDestination("connection_type_selection/{deviceType}") {
         fun createRoute(deviceType: String) = "connection_type_selection/$deviceType"
     }

@@ -23,6 +23,7 @@ import com.atakolstudio.sure.data.ir.BrandIrCodeSet
 @Composable
 fun BrandSelectionScreen(
     onBrandSelected: (BrandIrCodeSet) -> Unit,
+    onManualSearchClick: () -> Unit,
     onBack: () -> Unit,
     viewModel: BrandSelectionViewModel = hiltViewModel()
 ) {
@@ -51,6 +52,29 @@ fun BrandSelectionScreen(
                 singleLine = true,
                 shape = RoundedCornerShape(16.dp)
             )
+
+            Surface(
+                onClick = onManualSearchClick,
+                shape = RoundedCornerShape(14.dp),
+                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)
+            ) {
+                Row(
+                    modifier = Modifier.padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(Icons.Filled.Search, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                    Spacer(Modifier.width(12.dp))
+                    Column {
+                        Text("Markamı Bilmiyorum", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                        Text(
+                            "Kod tarayarak veya elle IR kodu girerek bulun",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                        )
+                    }
+                }
+            }
 
             LazyColumn(
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
