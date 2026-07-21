@@ -100,7 +100,35 @@ private fun ScanModeContent(state: ManualSearchUiState, viewModel: ManualSearchV
             textAlign = androidx.compose.ui.text.style.TextAlign.Center
         )
 
-        Spacer(Modifier.height(20.dp))
+        Spacer(Modifier.height(12.dp))
+
+        Surface(
+            shape = RoundedCornerShape(14.dp),
+            color = MaterialTheme.colorScheme.surfaceVariant,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Row(
+                modifier = Modifier.padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text("Kör Tarama", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    Text(
+                        "Bilinen markalara ek olarak, veritabanında HİÇ tanımlı olmayan " +
+                            "cihazları bulmak için geniş bir NEC/Sony kod taraması ekler " +
+                            "(binlerce kombinasyon; uzun sürebilir, istediğiniz an durdurabilirsiniz).",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                    )
+                }
+                Switch(
+                    checked = state.blindScanEnabled,
+                    onCheckedChange = { viewModel.setBlindScanEnabled(it) }
+                )
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
 
         if (state.exhausted) {
             Icon(Icons.Filled.Search, contentDescription = null, modifier = Modifier.size(64.dp))
@@ -108,7 +136,10 @@ private fun ScanModeContent(state: ManualSearchUiState, viewModel: ManualSearchV
             Text("Listedeki hiçbir kod eşleşmedi.", style = MaterialTheme.typography.titleMedium)
             Spacer(Modifier.height(4.dp))
             Text(
-                "\"Elle Kod Gir\" sekmesinden cihazınızın IR kodunu manuel olarak deneyebilirsiniz.",
+                if (state.blindScanEnabled)
+                    "Kör tarama da dahil tüm kodlar denendi. \"Elle Kod Gir\" sekmesini de deneyebilirsiniz."
+                else
+                    "Kör Tarama anahtarını açarak veritabanında tanımlı olmayan cihazları da arayabilirsiniz.",
                 style = MaterialTheme.typography.bodyMedium,
                 textAlign = androidx.compose.ui.text.style.TextAlign.Center
             )
@@ -122,6 +153,11 @@ private fun ScanModeContent(state: ManualSearchUiState, viewModel: ManualSearchV
             "Deneme ${state.currentIndex + 1} / ${state.candidates.size}",
             style = MaterialTheme.typography.labelLarge,
             color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
+        )
+        Spacer(Modifier.height(4.dp))
+        LinearProgressIndicator(
+            progress = { (state.currentIndex + 1).toFloat() / state.candidates.size.toFloat() },
+            modifier = Modifier.fillMaxWidth()
         )
         Spacer(Modifier.height(8.dp))
         Card(shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
@@ -137,11 +173,35 @@ private fun ScanModeContent(state: ManualSearchUiState, viewModel: ManualSearchV
 
         Spacer(Modifier.height(20.dp))
 
-        Button(
-            onClick = { viewModel.testCurrentCandidate() },
-            modifier = Modifier.fillMaxWidth().height(56.dp)
-        ) {
-            Text("TEST ET (Güç Sinyali Gönder)", fontWeight = FontWeight.SemiBold)
+        if (state.isAutoScanning) {
+            Button(
+                onClick = { viewModel.stopAutoScan() },
+                modifier = Modifier.fillMaxWidth().height(56.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+            ) {
+                Text("DURDUR — Otomatik Tarama Sürüyor", fontWeight = FontWeight.SemiBold)
+            }
+            Spacer(Modifier.height(8.dp))
+            Text(
+                "Cihazınız tepki verir vermez yukarıdaki butona basıp durdurun, ardından \"Evet, Bu Doğru\" ile onaylayın.",
+                style = MaterialTheme.typography.bodyMedium,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+            )
+        } else {
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+                OutlinedButton(
+                    onClick = { viewModel.toggleAutoScan() },
+                    modifier = Modifier.weight(1f).height(56.dp)
+                ) {
+                    Text("▶ Otomatik Tara")
+                }
+                Button(
+                    onClick = { viewModel.testCurrentCandidate() },
+                    modifier = Modifier.weight(1f).height(56.dp)
+                ) {
+                    Text("TEST ET", fontWeight = FontWeight.SemiBold)
+                }
+            }
         }
 
         Spacer(Modifier.height(20.dp))

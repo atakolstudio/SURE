@@ -3,6 +3,7 @@ package com.atakolstudio.sure.ui.screens.manualsearch
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.atakolstudio.sure.data.ir.BlindScanCandidates
 import com.atakolstudio.sure.data.ir.BrandIrCodeSet
 import com.atakolstudio.sure.data.ir.BrandIrDatabase
 import com.atakolstudio.sure.data.ir.CUSTOM_BRAND_KEY
@@ -18,9 +19,12 @@ import com.atakolstudio.sure.data.repository.DeviceRepository
 import com.atakolstudio.sure.domain.model.ConnectionType
 import com.atakolstudio.sure.domain.model.DeviceType
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -36,6 +40,8 @@ data class ManualSearchUiState(
     val hasIrHardware: Boolean = true,
     val lastMessage: String? = null,
     val savedDeviceId: Long? = null,
+    val blindScanEnabled: Boolean = false,
+    val isAutoScanning: Boolean = false,
     // Elle kod girme alanları
     val rawProtocol: IrProtocol = IrProtocol.NEC,
     val rawAddressText: String = "",
@@ -53,6 +59,7 @@ class ManualSearchViewModel @Inject constructor(
 ) : ViewModel() {
 
     private val _uiState: MutableStateFlow<ManualSearchUiState>
+    private var autoScanJob: Job? = null
 
     init {
         val deviceType = runCatching {
@@ -74,12 +81,34 @@ class ManualSearchViewModel @Inject constructor(
     val uiState: StateFlow<ManualSearchUiState> = _uiState.asStateFlow()
 
     fun setMode(mode: ManualSearchMode) {
+        stopAutoScan()
         _uiState.value = _uiState.value.copy(mode = mode, lastMessage = null)
     }
 
     // ------------------------------------------------------------------
-    // MOD 1: Kod Tarama (Marka listesinde sırayla dene)
+    // MOD 1: Kod Tarama (bilinen markalar + isteğe bağlı Kör Tarama)
     // ------------------------------------------------------------------
+
+    /**
+     * Kör Tarama açıldığında, veritabanındaki bilinen markalara ek olarak NEC/Sony
+     * protokollerinde geniş bir adres × komut taraması eklenir. Bu, veritabanında
+     * HİÇ tanımlı olmayan (isimsiz/OEM) cihazları da bulmayı mümkün kılar.
+     */
+    fun setBlindScanEnabled(enabled: Boolean) {
+        stopAutoScan()
+        val newCandidates = if (enabled) {
+            BrandIrDatabase.brands + BlindScanCandidates.generateFullBlindScan()
+        } else {
+            BrandIrDatabase.brands
+        }
+        _uiState.value = _uiState.value.copy(
+            blindScanEnabled = enabled,
+            candidates = newCandidates,
+            currentIndex = 0,
+            exhausted = false,
+            lastMessage = null
+        )
+    }
 
     fun testCurrentCandidate() {
         val candidate = _uiState.value.currentCandidate ?: return
@@ -88,16 +117,22 @@ class ManualSearchViewModel @Inject constructor(
     }
 
     fun nextCandidate() {
+        stopAutoScan()
+        advanceToNext()
+    }
+
+    private fun advanceToNext() {
         val state = _uiState.value
         val nextIndex = state.currentIndex + 1
         if (nextIndex >= state.candidates.size) {
-            _uiState.value = state.copy(exhausted = true)
+            _uiState.value = state.copy(exhausted = true, isAutoScanning = false)
         } else {
             _uiState.value = state.copy(currentIndex = nextIndex, lastMessage = null)
         }
     }
 
     fun previousCandidate() {
+        stopAutoScan()
         val state = _uiState.value
         if (state.currentIndex > 0) {
             _uiState.value = state.copy(currentIndex = state.currentIndex - 1, lastMessage = null, exhausted = false)
@@ -105,15 +140,58 @@ class ManualSearchViewModel @Inject constructor(
     }
 
     fun restartScan() {
+        stopAutoScan()
         _uiState.value = _uiState.value.copy(currentIndex = 0, exhausted = false, lastMessage = null)
     }
 
+    /**
+     * Otomatik tarama: elle "Sıradaki" tıklamak yerine, belirli aralıklarla
+     * kendiliğinden test gönderip ilerler. Kullanıcı cihaz tepki verdiği an
+     * durdurup "Evet, Bu Doğru" ile onaylar.
+     */
+    fun toggleAutoScan() {
+        if (_uiState.value.isAutoScanning) {
+            stopAutoScan()
+        } else {
+            startAutoScan()
+        }
+    }
+
+    private fun startAutoScan() {
+        if (autoScanJob?.isActive == true) return
+        _uiState.value = _uiState.value.copy(isAutoScanning = true, exhausted = false)
+        autoScanJob = viewModelScope.launch {
+            while (isActive && _uiState.value.isAutoScanning) {
+                val state = _uiState.value
+                if (state.exhausted) {
+                    _uiState.value = state.copy(isAutoScanning = false)
+                    break
+                }
+                testCurrentCandidate()
+                delay(1200)
+                if (!_uiState.value.isAutoScanning) break
+                advanceToNext()
+            }
+        }
+    }
+
+    fun stopAutoScan() {
+        autoScanJob?.cancel()
+        autoScanJob = null
+        if (_uiState.value.isAutoScanning) {
+            _uiState.value = _uiState.value.copy(isAutoScanning = false)
+        }
+    }
+
     fun confirmCurrentMatch(nickname: String) {
+        stopAutoScan()
         val state = _uiState.value
         val brand = state.currentCandidate ?: return
+        val isNamedBrand = BrandIrDatabase.brands.any { it.brandKey == brand.brandKey }
+
         viewModelScope.launch {
             val now = System.currentTimeMillis()
-            val id = repository.addDevice(
+            val entity = if (isNamedBrand) {
                 SavedDeviceEntity(
                     nickname = nickname.ifBlank { brand.displayNameEn },
                     brandKey = brand.brandKey,
@@ -123,7 +201,32 @@ class ManualSearchViewModel @Inject constructor(
                     createdAtEpochMillis = now,
                     lastUsedEpochMillis = now
                 )
-            )
+            } else {
+                // Kör taramadan bulunan, veritabanında tanımlı olmayan bir cihaz.
+                // "Custom" olarak, bulunan protokol/adres ile kaydedilir. NEC ise
+                // diğer tuşlar için de makul bir şablon uygulanır.
+                val powerCommand = brand.commands[RemoteButton.POWER] ?: 0
+                val fullCommands = if (brand.protocol == IrProtocol.NEC) {
+                    buildNecTemplateCommands(testedPowerCommand = powerCommand)
+                } else {
+                    brand.commands
+                }
+                val displayName = nickname.ifBlank { "Bulunan Cihaz" }
+                SavedDeviceEntity(
+                    nickname = displayName,
+                    brandKey = CUSTOM_BRAND_KEY,
+                    brandDisplayName = displayName,
+                    deviceType = state.deviceType.name,
+                    connectionType = state.connectionType.name,
+                    createdAtEpochMillis = now,
+                    lastUsedEpochMillis = now,
+                    customProtocol = brand.protocol.name,
+                    customAddress = brand.address,
+                    customExtendedAddress = brand.extendedAddress,
+                    customCommandsJson = fullCommands.toJsonString()
+                )
+            }
+            val id = repository.addDevice(entity)
             _uiState.value = _uiState.value.copy(savedDeviceId = id)
         }
     }
@@ -177,9 +280,6 @@ class ManualSearchViewModel @Inject constructor(
         val command = parseFlexibleInt(state.rawCommandText) ?: return
         val extendedAddress = parseFlexibleInt(state.rawExtendedAddressText)
 
-        // NEC ailesinde, bulunan tek adresle diğer tuşlar için de makul bir şablon
-        // üretebiliyoruz (bkz. buildNecTemplateCommands). Diğer protokollerde ise
-        // sadece test edilen (genelde POWER) tuşu kaydedilir.
         val commands: Map<RemoteButton, Int> = if (state.rawProtocol == IrProtocol.NEC) {
             buildNecTemplateCommands(testedPowerCommand = command)
         } else {
@@ -210,6 +310,11 @@ class ManualSearchViewModel @Inject constructor(
 
     fun clearMessage() {
         _uiState.value = _uiState.value.copy(lastMessage = null)
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        autoScanJob?.cancel()
     }
 
     private fun messageFor(result: IrTransmitResult): String? = when (result) {
