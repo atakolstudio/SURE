@@ -12,7 +12,8 @@ enum class IrProtocol(val carrierFrequencyHz: Int) {
     SONY_SIRC20(40000),  // Sony (20-bit, genişletilmiş)
     RC5(36000),          // Philips, Grundig, Telefunken, Marantz
     RC6(36000),          // Philips (yeni nesil), Panasonic bazı modeller
-    PANASONIC(37000)     // Panasonic (Kaseikyo ailesi)
+    PANASONIC(37000),    // Panasonic (Kaseikyo ailesi)
+    JVC(38000)           // JVC ve türevleri (16 bit, tümleç yok)
 }
 
 /**

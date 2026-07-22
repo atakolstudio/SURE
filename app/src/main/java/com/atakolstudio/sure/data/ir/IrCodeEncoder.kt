@@ -24,6 +24,7 @@ object IrCodeEncoder {
         IrProtocol.RC5 -> encodeRc5(cmd)
         IrProtocol.RC6 -> encodeRc6(cmd)
         IrProtocol.PANASONIC -> encodePanasonic(cmd)
+        IrProtocol.JVC -> encodeJvc(cmd)
     }
 
     // ---------------------------------------------------------------------
@@ -185,6 +186,26 @@ object IrCodeEncoder {
             pulses += if (bit == 1) 1300 else 435
         }
         pulses += 435
+        return pulses.toIntArray()
+    }
+
+    // ---------------------------------------------------------------------
+    // JVC — 8000/4000us header, 16 bit (8 bit adres + 8 bit komut, tümleç yok),
+    // LSB-first. Her bit: 600us açık + (550us=0 / 1600us=1) kapalı.
+    // ---------------------------------------------------------------------
+    private fun encodeJvc(cmd: IrCommand): IntArray {
+        val pulses = mutableListOf<Int>()
+        pulses += 8000; pulses += 4000 // header
+
+        val bits = mutableListOf<Int>()
+        appendByteLsbFirst(bits, cmd.address and 0xFF)
+        appendByteLsbFirst(bits, cmd.command and 0xFF)
+
+        for (bit in bits) {
+            pulses += 600
+            pulses += if (bit == 1) 1600 else 550
+        }
+        pulses += 600 // trailing mark
         return pulses.toIntArray()
     }
 

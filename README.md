@@ -140,6 +140,24 @@ Marka Seçimi ekranındaki **"Markamı Bilmiyorum"** kartına dokunun. İki yön
 Bu şekilde kaydedilen "özel" cihazlar, `SavedDeviceEntity` içinde `brandKey = "custom"`
 ile ve kendi protokol/adres/komut bilgileriyle saklanır (bkz. `data/ir/SavedDeviceIrMapper.kt`).
 
+## IR Kod Kaynağı: LIRC Veritabanı
+
+Marka kod tablosundaki çoğu **doğrulanmış (verified=true)** kod seti, [LIRC (Linux
+Infrared Remote Control) projesinin açık kaynak "remotes" veritabanından](https://lirc.sourceforge.net/remotes/)
+(ayna: [github.com/probonopd/lirc-remotes](https://github.com/probonopd/lirc-remotes))
+türetilmiştir. Bu veritabanı, gerçek kumandaların bir kızılötesi alıcısıyla okunup
+analiz edilmesiyle oluşturulmuş, on yıllardır kullanılan bir açık kaynak kaynağıdır.
+
+Bu sayede şu markalar artık **gerçek, doğrulanmış** kodlarla geliyor: Samsung, LG,
+Sony, Philips (elle doğrulanmış) + Toshiba, Sharp, Vestel, Insignia, JVC, Telefunken,
+Grundig, AOC, Sanyo, Vizio, Thomson, Daewoo, Akai, RCA, Orion, Polaroid, Goldstar,
+Beko (LIRC kaynaklı). Bu süreçte ayrıca **JVC protokolü** de motora eklendi (16 bit,
+tümleç yok, `IrProtocol.JVC`).
+
+Hâlâ jenerik kod kullanan markalar (Hisense, TCL, Changhong, Konka, Skyworth, Regal,
+Arçelik, Panasonic) için LIRC veritabanında doğrudan bir karşılık bulunamadı veya
+desteklenmeyen bir protokol (Thomson-özel, Emerson, Aiwa, RECS80 vb.) kullanıyordu.
+
 ## İzinler
 
 | İzin | Amaç |
