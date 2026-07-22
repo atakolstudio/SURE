@@ -11,6 +11,7 @@ import com.atakolstudio.sure.data.ir.IrCommand
 import com.atakolstudio.sure.data.ir.IrProtocol
 import com.atakolstudio.sure.data.ir.IrTransmitResult
 import com.atakolstudio.sure.data.ir.IrTransmitter
+import com.atakolstudio.sure.data.ir.LircBlindScanLoader
 import com.atakolstudio.sure.data.ir.RemoteButton
 import com.atakolstudio.sure.data.ir.buildNecTemplateCommands
 import com.atakolstudio.sure.data.ir.toJsonString
@@ -41,6 +42,7 @@ data class ManualSearchUiState(
     val lastMessage: String? = null,
     val savedDeviceId: Long? = null,
     val blindScanEnabled: Boolean = false,
+    val extremeScanEnabled: Boolean = false,
     val isAutoScanning: Boolean = false,
     // Elle kod girme alanları
     val rawProtocol: IrProtocol = IrProtocol.NEC,
@@ -55,6 +57,7 @@ data class ManualSearchUiState(
 class ManualSearchViewModel @Inject constructor(
     private val irTransmitter: IrTransmitter,
     private val repository: DeviceRepository,
+    private val lircBlindScanLoader: LircBlindScanLoader,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
@@ -90,24 +93,54 @@ class ManualSearchViewModel @Inject constructor(
     // ------------------------------------------------------------------
 
     /**
-     * Kör Tarama açıldığında, veritabanındaki bilinen markalara ek olarak NEC/Sony
-     * protokollerinde geniş bir adres × komut taraması eklenir. Bu, veritabanında
-     * HİÇ tanımlı olmayan (isimsiz/OEM) cihazları da bulmayı mümkün kılar.
+     * Kör Tarama açıldığında, veritabanındaki bilinen ~25 markaya ek olarak,
+     * LIRC (Linux Infrared Remote Control) açık kaynak veritabanından derlenmiş
+     * ~371 GERÇEK kumanda kodu eklenir (bkz. LircBlindScanLoader). Bu kodlar, gerçek
+     * kumandalardan okunmuştur; bu yüzden rastgele üretilmiş bir kod ızgarasından çok
+     * daha yüksek eşleşme ihtimaline sahiptir ve çoğu zaman güç dışında ses, kanal,
+     * D-pad gibi diğer tuşları da içerir.
      */
     fun setBlindScanEnabled(enabled: Boolean) {
         stopAutoScan()
-        val newCandidates = if (enabled) {
-            BrandIrDatabase.brands + BlindScanCandidates.generateFullBlindScan()
-        } else {
-            BrandIrDatabase.brands
-        }
         _uiState.value = _uiState.value.copy(
             blindScanEnabled = enabled,
-            candidates = newCandidates,
             currentIndex = 0,
             exhausted = false,
             lastMessage = null
         )
+        rebuildCandidates()
+    }
+
+    /**
+     * Ekstra "Aşırı Tarama": LIRC veritabanında da karşılığı çıkmayan, gerçekten
+     * isimsiz/kataloglanmamış cihazlar için son çare. NEC/Sony protokollerinde
+     * sistematik bir adres × komut ızgarası dener (binlerce kombinasyon, yalnızca
+     * güç tuşu test edilir). LIRC verisinden çok daha düşük isabet ihtimaline
+     * sahiptir, bu yüzden ayrı ve varsayılan olarak kapalı bir anahtardır.
+     */
+    fun setExtremeScanEnabled(enabled: Boolean) {
+        stopAutoScan()
+        _uiState.value = _uiState.value.copy(
+            extremeScanEnabled = enabled,
+            currentIndex = 0,
+            exhausted = false,
+            lastMessage = null
+        )
+        rebuildCandidates()
+    }
+
+    private fun rebuildCandidates() {
+        val state = _uiState.value
+        val candidates = buildList {
+            addAll(BrandIrDatabase.brands)
+            if (state.blindScanEnabled) {
+                addAll(lircBlindScanLoader.loadCandidates())
+            }
+            if (state.extremeScanEnabled) {
+                addAll(BlindScanCandidates.generateFullBlindScan())
+            }
+        }
+        _uiState.value = _uiState.value.copy(candidates = candidates)
     }
 
     fun testCurrentCandidate() {
@@ -202,12 +235,12 @@ class ManualSearchViewModel @Inject constructor(
                     lastUsedEpochMillis = now
                 )
             } else {
-                // Kör taramadan bulunan, veritabanında tanımlı olmayan bir cihaz.
-                // "Custom" olarak, bulunan protokol/adres ile kaydedilir. NEC ise
-                // diğer tuşlar için de makul bir şablon uygulanır.
-                val powerCommand = brand.commands[RemoteButton.POWER] ?: 0
-                val fullCommands = if (brand.protocol == IrProtocol.NEC) {
-                    buildNecTemplateCommands(testedPowerCommand = powerCommand)
+                // Kör taramadan bulunan, veritabanında adıyla tanımlı olmayan bir cihaz.
+                // "Custom" olarak, bulunan protokol/adres ile kaydedilir. LIRC kaynaklı
+                // adaylar genelde zaten zengin (çok tuşlu) bir komut haritasına sahiptir;
+                // yalnızca tek tuşlu (sentetik "Aşırı Tarama") adaylarda NEC şablonu uygulanır.
+                val fullCommands = if (brand.commands.size <= 1 && brand.protocol == IrProtocol.NEC) {
+                    buildNecTemplateCommands(testedPowerCommand = brand.commands[RemoteButton.POWER] ?: 0)
                 } else {
                     brand.commands
                 }

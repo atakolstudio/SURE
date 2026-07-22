@@ -128,9 +128,19 @@ BrandIrCodeSet(
 Marka listesinde cihazınızı bulamıyorsanız veya markanız var ama kodu çalışmıyorsa,
 Marka Seçimi ekranındaki **"Markamı Bilmiyorum"** kartına dokunun. İki yöntem sunulur:
 
-1. **Kod Tarama**: Uygulama, veritabanındaki markaları sırayla dener (klasik evrensel
-   kumanda "brand hunt" yöntemi). Her denemede TEST butonuna basıp cihazınızın tepki
-   verip vermediğini kontrol edersiniz; tepki verirse o kodu kaydedersiniz.
+1. **Kod Tarama**: Uygulama, üç kademeli bir aday listesini sırayla dener:
+   - **Bilinen Markalar** (~25): veritabanındaki isimli markalar, her zaman aktif.
+   - **Kör Tarama** (isteğe bağlı anahtar): LIRC açık kaynak veritabanının tamamı
+     taranarak (~2650 kumanda konfigürasyon dosyası) elde edilen **371 benzersiz,
+     GERÇEK kumanda kodu** (`assets/lirc_blind_scan.json`, bkz. `LircBlindScanLoader.kt`).
+     Bu kodlar genelde sadece güç değil, ses/kanal/D-pad gibi birçok tuşu da içerir.
+   - **Aşırı Tarama** (isteğe bağlı, ikinci anahtar): LIRC'te de karşılığı çıkmayan
+     gerçekten kataloglanmamış cihazlar için son çare — NEC/Sony protokollerinde
+     sistematik bir adres × komut ızgarası (`BlindScanCandidates.kt`), yalnızca güç
+     tuşu test edilir, çok daha düşük isabet ihtimaliyle.
+
+   Otomatik Tarama düğmesiyle (▶) elle "sıradaki" tıklamak yerine ~1.2 saniyede bir
+   kendiliğinden ilerleyebilir; cihaz tepki verdiği an DURDUR'a basıp onaylarsınız.
 2. **Elle Kod Gir**: Bir IR alıcı/analiz uygulamasıyla orijinal kumandanızın protokolünü,
    adresini ve komut baytını okuduysanız, bunları doğrudan girip test edebilir ve
    çalışırsa cihaz olarak kaydedebilirsiniz. NEC protokolünde, bulunan adresle diğer

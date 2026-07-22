@@ -114,9 +114,9 @@ private fun ScanModeContent(state: ManualSearchUiState, viewModel: ManualSearchV
                 Column(Modifier.weight(1f)) {
                     Text("Kör Tarama", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                     Text(
-                        "Bilinen markalara ek olarak, veritabanında HİÇ tanımlı olmayan " +
-                            "cihazları bulmak için geniş bir NEC/Sony kod taraması ekler " +
-                            "(binlerce kombinasyon; uzun sürebilir, istediğiniz an durdurabilirsiniz).",
+                        "LIRC açık kaynak veritabanından derlenmiş ~371 GERÇEK kumanda kodu ekler " +
+                            "(sadece güç değil, çoğunlukla ses/kanal/D-pad da dahil). Veritabanında " +
+                            "adıyla tanımlı olmayan cihazları bulmak için en iyi seçenektir.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
                     )
@@ -124,6 +124,34 @@ private fun ScanModeContent(state: ManualSearchUiState, viewModel: ManualSearchV
                 Switch(
                     checked = state.blindScanEnabled,
                     onCheckedChange = { viewModel.setBlindScanEnabled(it) }
+                )
+            }
+        }
+
+        Spacer(Modifier.height(8.dp))
+
+        Surface(
+            shape = RoundedCornerShape(14.dp),
+            color = MaterialTheme.colorScheme.surfaceVariant,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Row(
+                modifier = Modifier.padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text("Aşırı Tarama", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    Text(
+                        "Son çare: LIRC'te de bulunamayan gerçekten kataloglanmamış cihazlar için " +
+                            "sistematik bir NEC/Sony adres taraması ekler (binlerce kombinasyon, " +
+                            "sadece güç tuşu, çok daha uzun sürer, düşük isabet ihtimali).",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                    )
+                }
+                Switch(
+                    checked = state.extremeScanEnabled,
+                    onCheckedChange = { viewModel.setExtremeScanEnabled(it) }
                 )
             }
         }
@@ -136,10 +164,12 @@ private fun ScanModeContent(state: ManualSearchUiState, viewModel: ManualSearchV
             Text("Listedeki hiçbir kod eşleşmedi.", style = MaterialTheme.typography.titleMedium)
             Spacer(Modifier.height(4.dp))
             Text(
-                if (state.blindScanEnabled)
-                    "Kör tarama da dahil tüm kodlar denendi. \"Elle Kod Gir\" sekmesini de deneyebilirsiniz."
+                if (state.blindScanEnabled && state.extremeScanEnabled)
+                    "Kör Tarama ve Aşırı Tarama dahil tüm kodlar denendi. \"Elle Kod Gir\" sekmesini de deneyebilirsiniz."
+                else if (state.blindScanEnabled)
+                    "Kör Tarama dahil tüm kodlar denendi. \"Aşırı Tarama\"yı açarak son bir deneme daha yapabilir, ya da \"Elle Kod Gir\" sekmesini deneyebilirsiniz."
                 else
-                    "Kör Tarama anahtarını açarak veritabanında tanımlı olmayan cihazları da arayabilirsiniz.",
+                    "Kör Tarama anahtarını açarak veritabanında adıyla tanımlı olmayan cihazları da (gerçek LIRC verileriyle) arayabilirsiniz.",
                 style = MaterialTheme.typography.bodyMedium,
                 textAlign = androidx.compose.ui.text.style.TextAlign.Center
             )
