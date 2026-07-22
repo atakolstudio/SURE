@@ -28,24 +28,9 @@ jobs:
         run: chmod +x gradlew
 
       - name: Build Debug APK
-        run: |
-          set -o pipefail
-          ./gradlew assembleDebug --stacktrace 2>&1 | tee build_output.log
-        continue-on-error: true
-        id: build_step
-
-      - name: Upload build log to Gist on failure
-        if: steps.build_step.outcome == 'failure'
-        env:
-          GIST_TOKEN: ${{ secrets.TEMP_DEBUG_GIST_TOKEN }}
-        run: python3 .github/scripts/upload_log_gist.py
-
-      - name: Fail job if build failed
-        if: steps.build_step.outcome == 'failure'
-        run: exit 1
+        run: ./gradlew assembleDebug --stacktrace
 
       - name: Upload APK artifact
-        if: steps.build_step.outcome == 'success'
         uses: actions/upload-artifact@v4
         with:
           name: sure-debug-apk
