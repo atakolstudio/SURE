@@ -1,17 +1,25 @@
 package com.atakolstudio.sure.ui.screens.manualsearch
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.atakolstudio.sure.data.ir.IrProtocol
@@ -41,7 +49,7 @@ fun ManualSearchScreen(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
-                title = { Text("Markamı Bilmiyorum — Manuel Bul") },
+                title = { Text("Manuel Bul", fontWeight = FontWeight.SemiBold) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.Filled.ArrowBack, contentDescription = "Geri")
@@ -85,183 +93,252 @@ fun ManualSearchScreen(
     }
 }
 
+/** Kör Tarama / Aşırı Tarama seçeneklerinin sunulduğu ayrı, özel "Tarama Modu" menüsü. */
+@Composable
+private fun ScanTierDialog(
+    currentTier: ScanTier,
+    onSelect: (ScanTier) -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Tarama Modu") },
+        text = {
+            Column {
+                ScanTier.entries.forEach { tier ->
+                    val selected = tier == currentTier
+                    Surface(
+                        shape = RoundedCornerShape(14.dp),
+                        color = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f) else Color.Transparent,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp)
+                            .selectable(selected = selected, onClick = { onSelect(tier) })
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(12.dp),
+                            verticalAlignment = Alignment.Top
+                        ) {
+                            RadioButton(selected = selected, onClick = { onSelect(tier) })
+                            Spacer(Modifier.width(4.dp))
+                            Column {
+                                Text(tier.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                                Spacer(Modifier.height(2.dp))
+                                Text(
+                                    tier.description,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text("Kapat") }
+        }
+    )
+}
+
+@Composable
+private fun ScanTierChip(tier: ScanTier, onClick: () -> Unit) {
+    AssistChip(
+        onClick = onClick,
+        label = { Text("Tarama Modu: ${tier.title}") },
+        leadingIcon = { Icon(Icons.Filled.Tune, contentDescription = null, modifier = Modifier.size(18.dp)) }
+    )
+}
+
 @Composable
 private fun ScanModeContent(state: ManualSearchUiState, viewModel: ManualSearchViewModel) {
     var nickname by remember { mutableStateOf("") }
+    var scanTierMenuVisible by remember { mutableStateOf(false) }
+    val scrollState = rememberScrollState()
 
     Column(
-        modifier = Modifier.fillMaxSize().padding(20.dp),
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(scrollState)
+            .padding(horizontal = 20.dp, vertical = 16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
-            "Uzaktan kumandayı (telefonu) cihazınıza yöneltin, TEST butonuna basın. " +
-                "Cihaz tepki verirse (açılır/kapanır) \"Evet, Bu Doğru\" seçin; vermezse sıradakini deneyin.",
+            "Kumandayı (telefonu) cihazınıza yöneltin, TEST butonuna basın. Cihaz tepki " +
+                "verirse (açılır/kapanır) \"Evet, Bu Doğru\" seçin; vermezse sıradakini deneyin.",
             style = MaterialTheme.typography.bodyMedium,
-            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+            textAlign = TextAlign.Center,
+            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.75f)
         )
 
-        Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(14.dp))
 
-        Surface(
-            shape = RoundedCornerShape(14.dp),
-            color = MaterialTheme.colorScheme.surfaceVariant,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Row(
-                modifier = Modifier.padding(16.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(Modifier.weight(1f)) {
-                    Text("Kör Tarama", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                    Text(
-                        "LIRC açık kaynak veritabanından derlenmiş ~371 GERÇEK kumanda kodu ekler " +
-                            "(sadece güç değil, çoğunlukla ses/kanal/D-pad da dahil). Veritabanında " +
-                            "adıyla tanımlı olmayan cihazları bulmak için en iyi seçenektir.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-                    )
-                }
-                Switch(
-                    checked = state.blindScanEnabled,
-                    onCheckedChange = { viewModel.setBlindScanEnabled(it) }
-                )
-            }
-        }
+        ScanTierChip(tier = state.scanTier, onClick = { scanTierMenuVisible = true })
 
-        Spacer(Modifier.height(8.dp))
-
-        Surface(
-            shape = RoundedCornerShape(14.dp),
-            color = MaterialTheme.colorScheme.surfaceVariant,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Row(
-                modifier = Modifier.padding(16.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(Modifier.weight(1f)) {
-                    Text("Aşırı Tarama", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                    Text(
-                        "Son çare: LIRC'te de bulunamayan gerçekten kataloglanmamış cihazlar için " +
-                            "sistematik bir NEC/Sony adres taraması ekler (binlerce kombinasyon, " +
-                            "sadece güç tuşu, çok daha uzun sürer, düşük isabet ihtimali).",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-                    )
-                }
-                Switch(
-                    checked = state.extremeScanEnabled,
-                    onCheckedChange = { viewModel.setExtremeScanEnabled(it) }
-                )
-            }
-        }
-
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(20.dp))
 
         if (state.exhausted) {
-            Icon(Icons.Filled.Search, contentDescription = null, modifier = Modifier.size(64.dp))
-            Spacer(Modifier.height(12.dp))
-            Text("Listedeki hiçbir kod eşleşmedi.", style = MaterialTheme.typography.titleMedium)
-            Spacer(Modifier.height(4.dp))
+            EmptyResultState(state = state, onRestart = { viewModel.restartScan() })
+        } else {
+            val candidate = state.currentCandidate
+
             Text(
-                if (state.blindScanEnabled && state.extremeScanEnabled)
-                    "Kör Tarama ve Aşırı Tarama dahil tüm kodlar denendi. \"Elle Kod Gir\" sekmesini de deneyebilirsiniz."
-                else if (state.blindScanEnabled)
-                    "Kör Tarama dahil tüm kodlar denendi. \"Aşırı Tarama\"yı açarak son bir deneme daha yapabilir, ya da \"Elle Kod Gir\" sekmesini deneyebilirsiniz."
-                else
-                    "Kör Tarama anahtarını açarak veritabanında adıyla tanımlı olmayan cihazları da (gerçek LIRC verileriyle) arayabilirsiniz.",
-                style = MaterialTheme.typography.bodyMedium,
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                "Deneme ${state.currentIndex + 1} / ${state.candidates.size}",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
+            )
+            Spacer(Modifier.height(6.dp))
+            LinearProgressIndicator(
+                progress = { (state.currentIndex + 1).toFloat() / state.candidates.size.toFloat() },
+                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(4.dp))
             )
             Spacer(Modifier.height(16.dp))
-            Button(onClick = { viewModel.restartScan() }) { Text("Baştan Başla") }
-            return
-        }
 
-        val candidate = state.currentCandidate
-        Text(
-            "Deneme ${state.currentIndex + 1} / ${state.candidates.size}",
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
-        )
-        Spacer(Modifier.height(4.dp))
-        LinearProgressIndicator(
-            progress = { (state.currentIndex + 1).toFloat() / state.candidates.size.toFloat() },
-            modifier = Modifier.fillMaxWidth()
-        )
-        Spacer(Modifier.height(8.dp))
-        Card(shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(
-                    candidate?.displayNameEn ?: "-",
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(candidate?.displayNameLocal ?: "", style = MaterialTheme.typography.bodyMedium)
-            }
-        }
-
-        Spacer(Modifier.height(20.dp))
-
-        if (state.isAutoScanning) {
-            Button(
-                onClick = { viewModel.stopAutoScan() },
-                modifier = Modifier.fillMaxWidth().height(56.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+            Card(
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                modifier = Modifier.fillMaxWidth()
             ) {
-                Text("DURDUR — Otomatik Tarama Sürüyor", fontWeight = FontWeight.SemiBold)
+                Column(
+                    Modifier.padding(vertical = 28.dp, horizontal = 20.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(56.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Filled.Search, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                    }
+                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        candidate?.displayNameEn ?: "-",
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        candidate?.displayNameLocal ?: "",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                        textAlign = TextAlign.Center
+                    )
+                }
             }
-            Spacer(Modifier.height(8.dp))
-            Text(
-                "Cihazınız tepki verir vermez yukarıdaki butona basıp durdurun, ardından \"Evet, Bu Doğru\" ile onaylayın.",
-                style = MaterialTheme.typography.bodyMedium,
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+
+            Spacer(Modifier.height(20.dp))
+
+            AnimatedVisibility(visible = state.isAutoScanning) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Button(
+                        onClick = { viewModel.stopAutoScan() },
+                        modifier = Modifier.fillMaxWidth().height(56.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                    ) {
+                        Text("DURDUR — Otomatik Tarama Sürüyor", fontWeight = FontWeight.SemiBold)
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "Cihazınız tepki verir vermez yukarıdaki butona basıp durdurun, ardından \"Evet, Bu Doğru\" ile onaylayın.",
+                        style = MaterialTheme.typography.bodySmall,
+                        textAlign = TextAlign.Center,
+                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f)
+                    )
+                }
+            }
+
+            AnimatedVisibility(visible = !state.isAutoScanning) {
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+                    OutlinedButton(
+                        onClick = { viewModel.toggleAutoScan() },
+                        modifier = Modifier.weight(1f).height(56.dp)
+                    ) {
+                        Text("▶ Otomatik Tara")
+                    }
+                    Button(
+                        onClick = { viewModel.testCurrentCandidate() },
+                        modifier = Modifier.weight(1f).height(56.dp)
+                    ) {
+                        Text("TEST ET", fontWeight = FontWeight.SemiBold)
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(24.dp))
+            HorizontalDivider()
+            Spacer(Modifier.height(20.dp))
+
+            Text("Cihazınız tepki verdi mi?", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Spacer(Modifier.height(12.dp))
+
+            OutlinedTextField(
+                value = nickname,
+                onValueChange = { nickname = it },
+                label = { Text("Cihaz için isim (opsiyonel)") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth()
             )
-        } else {
+            Spacer(Modifier.height(12.dp))
+
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
                 OutlinedButton(
-                    onClick = { viewModel.toggleAutoScan() },
-                    modifier = Modifier.weight(1f).height(56.dp)
-                ) {
-                    Text("▶ Otomatik Tara")
-                }
+                    onClick = { viewModel.nextCandidate() },
+                    modifier = Modifier.weight(1f)
+                ) { Text("Hayır, Sıradaki") }
+
                 Button(
-                    onClick = { viewModel.testCurrentCandidate() },
-                    modifier = Modifier.weight(1f).height(56.dp)
-                ) {
-                    Text("TEST ET", fontWeight = FontWeight.SemiBold)
-                }
+                    onClick = { viewModel.confirmCurrentMatch(nickname) },
+                    modifier = Modifier.weight(1f)
+                ) { Text("Evet, Bu Doğru") }
+            }
+
+            if (state.currentIndex > 0) {
+                Spacer(Modifier.height(8.dp))
+                TextButton(onClick = { viewModel.previousCandidate() }) { Text("← Öncekine Dön") }
             }
         }
 
-        Spacer(Modifier.height(20.dp))
-        Text("Cihazınız tepki verdi mi?", style = MaterialTheme.typography.titleMedium)
-        Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(24.dp))
+    }
 
-        OutlinedTextField(
-            value = nickname,
-            onValueChange = { nickname = it },
-            label = { Text("Cihaz için isim (opsiyonel)") },
-            modifier = Modifier.fillMaxWidth()
+    if (scanTierMenuVisible) {
+        ScanTierDialog(
+            currentTier = state.scanTier,
+            onSelect = {
+                viewModel.setScanTier(it)
+                scanTierMenuVisible = false
+            },
+            onDismiss = { scanTierMenuVisible = false }
+        )
+    }
+}
+
+@Composable
+private fun EmptyResultState(state: ManualSearchUiState, onRestart: () -> Unit) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Icon(
+            Icons.Filled.Search,
+            contentDescription = null,
+            modifier = Modifier.size(64.dp),
+            tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.3f)
         )
         Spacer(Modifier.height(12.dp))
-
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-            OutlinedButton(
-                onClick = { viewModel.nextCandidate() },
-                modifier = Modifier.weight(1f)
-            ) { Text("Hayır, Sıradaki") }
-
-            Button(
-                onClick = { viewModel.confirmCurrentMatch(nickname) },
-                modifier = Modifier.weight(1f)
-            ) { Text("Evet, Bu Doğru") }
-        }
-
-        if (state.currentIndex > 0) {
-            Spacer(Modifier.height(8.dp))
-            TextButton(onClick = { viewModel.previousCandidate() }) { Text("← Öncekine Dön") }
-        }
+        Text("Listedeki hiçbir kod eşleşmedi.", style = MaterialTheme.typography.titleMedium)
+        Spacer(Modifier.height(4.dp))
+        Text(
+            when (state.scanTier) {
+                ScanTier.EXTREME -> "Aşırı Tarama dahil tüm kodlar denendi. \"Elle Kod Gir\" sekmesini deneyebilirsiniz."
+                ScanTier.BLIND -> "Kör Tarama dahil tüm kodlar denendi. \"Tarama Modu\"ndan Aşırı Tarama'yı deneyebilir, ya da \"Elle Kod Gir\" sekmesine geçebilirsiniz."
+                ScanTier.STANDARD -> "Sağ üstteki ayar simgesinden \"Kör Tarama\" moduna geçerek gerçek LIRC verileriyle arayabilirsiniz."
+            },
+            style = MaterialTheme.typography.bodyMedium,
+            textAlign = TextAlign.Center
+        )
+        Spacer(Modifier.height(16.dp))
+        Button(onClick = onRestart) { Text("Baştan Başla") }
     }
 }
 
@@ -279,7 +356,8 @@ private fun RawEntryModeContent(state: ManualSearchUiState, viewModel: ManualSea
             "Cihazınızın markası listede yok mu veya kod taraması sonuç vermedi mi? " +
                 "IR alıcılı bir uygulamayla orijinal kumandanızın gönderdiği protokol, " +
                 "adres ve komut değerlerini okuyup buraya girebilirsiniz.",
-            style = MaterialTheme.typography.bodyMedium
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.75f)
         )
         Spacer(Modifier.height(20.dp))
 
@@ -298,7 +376,7 @@ private fun RawEntryModeContent(state: ManualSearchUiState, viewModel: ManualSea
                 expanded = protocolMenuExpanded,
                 onDismissRequest = { protocolMenuExpanded = false }
             ) {
-                IrProtocol.values().forEach { protocol ->
+                IrProtocol.entries.forEach { protocol ->
                     DropdownMenuItem(
                         text = { Text(protocol.name) },
                         onClick = {
@@ -348,11 +426,14 @@ private fun RawEntryModeContent(state: ManualSearchUiState, viewModel: ManualSea
         }
 
         Spacer(Modifier.height(20.dp))
+        HorizontalDivider()
+        Spacer(Modifier.height(20.dp))
 
         OutlinedTextField(
             value = nickname,
             onValueChange = { nickname = it },
             label = { Text("Cihaz için isim (opsiyonel)") },
+            singleLine = true,
             modifier = Modifier.fillMaxWidth()
         )
         Spacer(Modifier.height(12.dp))

@@ -31,6 +31,29 @@ import javax.inject.Inject
 
 enum class ManualSearchMode { SCAN, RAW_ENTRY }
 
+/**
+ * Tarama kapsamı — kullanıcı bunlardan yalnızca birini seçer (ayrı bir "Tarama Modu"
+ * menüsünden). Her kademe bir öncekini kapsar.
+ */
+enum class ScanTier(val title: String, val description: String) {
+    STANDARD(
+        "Standart",
+        "Sadece veritabanındaki ~25 bilinen marka denenir. En hızlı seçenek."
+    ),
+    BLIND(
+        "Kör Tarama",
+        "Bilinen markalara ek olarak, LIRC açık kaynak veritabanından derlenmiş " +
+            "~371 GERÇEK kumanda kodu denenir (çoğunlukla ses/kanal/D-pad dahil). " +
+            "Veritabanında adıyla tanımlı olmayan cihazları bulmak için en iyi seçenek."
+    ),
+    EXTREME(
+        "Aşırı Tarama",
+        "Kör Tarama'ya ek olarak, LIRC'te de karşılığı çıkmayan cihazlar için " +
+            "sistematik bir NEC/Sony adres taraması eklenir (binlerce kombinasyon, " +
+            "sadece güç tuşu, çok daha uzun sürer, düşük isabet ihtimali)."
+    )
+}
+
 data class ManualSearchUiState(
     val mode: ManualSearchMode = ManualSearchMode.SCAN,
     val deviceType: DeviceType = DeviceType.TV,
@@ -41,8 +64,7 @@ data class ManualSearchUiState(
     val hasIrHardware: Boolean = true,
     val lastMessage: String? = null,
     val savedDeviceId: Long? = null,
-    val blindScanEnabled: Boolean = false,
-    val extremeScanEnabled: Boolean = false,
+    val scanTier: ScanTier = ScanTier.STANDARD,
     val isAutoScanning: Boolean = false,
     // Elle kod girme alanları
     val rawProtocol: IrProtocol = IrProtocol.NEC,
@@ -93,35 +115,13 @@ class ManualSearchViewModel @Inject constructor(
     // ------------------------------------------------------------------
 
     /**
-     * Kör Tarama açıldığında, veritabanındaki bilinen ~25 markaya ek olarak,
-     * LIRC (Linux Infrared Remote Control) açık kaynak veritabanından derlenmiş
-     * ~371 GERÇEK kumanda kodu eklenir (bkz. LircBlindScanLoader). Bu kodlar, gerçek
-     * kumandalardan okunmuştur; bu yüzden rastgele üretilmiş bir kod ızgarasından çok
-     * daha yüksek eşleşme ihtimaline sahiptir ve çoğu zaman güç dışında ses, kanal,
-     * D-pad gibi diğer tuşları da içerir.
+     * Tarama kademesini değiştirir (bkz. [ScanTier]). Kullanıcı "Tarama Modu"
+     * menüsünden tek bir kademe seçer; aday listesi ona göre yeniden kurulur.
      */
-    fun setBlindScanEnabled(enabled: Boolean) {
+    fun setScanTier(tier: ScanTier) {
         stopAutoScan()
         _uiState.value = _uiState.value.copy(
-            blindScanEnabled = enabled,
-            currentIndex = 0,
-            exhausted = false,
-            lastMessage = null
-        )
-        rebuildCandidates()
-    }
-
-    /**
-     * Ekstra "Aşırı Tarama": LIRC veritabanında da karşılığı çıkmayan, gerçekten
-     * isimsiz/kataloglanmamış cihazlar için son çare. NEC/Sony protokollerinde
-     * sistematik bir adres × komut ızgarası dener (binlerce kombinasyon, yalnızca
-     * güç tuşu test edilir). LIRC verisinden çok daha düşük isabet ihtimaline
-     * sahiptir, bu yüzden ayrı ve varsayılan olarak kapalı bir anahtardır.
-     */
-    fun setExtremeScanEnabled(enabled: Boolean) {
-        stopAutoScan()
-        _uiState.value = _uiState.value.copy(
-            extremeScanEnabled = enabled,
+            scanTier = tier,
             currentIndex = 0,
             exhausted = false,
             lastMessage = null
@@ -133,10 +133,10 @@ class ManualSearchViewModel @Inject constructor(
         val state = _uiState.value
         val candidates = buildList {
             addAll(BrandIrDatabase.brands)
-            if (state.blindScanEnabled) {
+            if (state.scanTier == ScanTier.BLIND || state.scanTier == ScanTier.EXTREME) {
                 addAll(lircBlindScanLoader.loadCandidates())
             }
-            if (state.extremeScanEnabled) {
+            if (state.scanTier == ScanTier.EXTREME) {
                 addAll(BlindScanCandidates.generateFullBlindScan())
             }
         }
