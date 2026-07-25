@@ -33,7 +33,7 @@ fun BrandSelectionScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Markanızı Bulun") },
+                title = { Text(if (viewModel.isAcDeviceType) "Klima Profili" else "Markanızı Bulun") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.Filled.ArrowBack, contentDescription = "Geri")
@@ -43,35 +43,51 @@ fun BrandSelectionScreen(
         }
     ) { padding ->
         Column(Modifier.padding(padding).fillMaxSize()) {
-            OutlinedTextField(
-                value = query,
-                onValueChange = viewModel::onQueryChange,
-                modifier = Modifier.fillMaxWidth().padding(16.dp),
-                placeholder = { Text("Marka ara...") },
-                leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
-                singleLine = true,
-                shape = RoundedCornerShape(16.dp)
-            )
-
-            Surface(
-                onClick = onManualSearchClick,
-                shape = RoundedCornerShape(14.dp),
-                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)
-            ) {
-                Row(
-                    modifier = Modifier.padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically
+            if (viewModel.isAcDeviceType) {
+                Surface(
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
+                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier.fillMaxWidth().padding(16.dp)
                 ) {
-                    Icon(Icons.Filled.Search, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                    Spacer(Modifier.width(12.dp))
-                    Column {
-                        Text("Markamı Bilmiyorum", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                        Text(
-                            "Kod tarayarak veya elle IR kodu girerek bulun",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-                        )
+                    Text(
+                        "Klima kumandaları, TV'lerin aksine her tuşta tüm durumu (sıcaklık+mod+fan) " +
+                            "tek seferde gönderir. Şu an için tek bir jenerik/örnek profil sunuluyor; " +
+                            "marka-özel klima desteği ileride eklenecek.",
+                        modifier = Modifier.padding(14.dp),
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+            } else {
+                OutlinedTextField(
+                    value = query,
+                    onValueChange = viewModel::onQueryChange,
+                    modifier = Modifier.fillMaxWidth().padding(16.dp),
+                    placeholder = { Text("Marka ara...") },
+                    leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
+                    singleLine = true,
+                    shape = RoundedCornerShape(16.dp)
+                )
+
+                Surface(
+                    onClick = onManualSearchClick,
+                    shape = RoundedCornerShape(14.dp),
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Filled.Search, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                        Spacer(Modifier.width(12.dp))
+                        Column {
+                            Text("Markamı Bilmiyorum", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                            Text(
+                                "Kod tarayarak veya elle IR kodu girerek bulun",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                            )
+                        }
                     }
                 }
             }

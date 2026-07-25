@@ -465,6 +465,22 @@ object BrandIrDatabase {
 
     fun findByKey(key: String): BrandIrCodeSet? = brands.find { it.brandKey == key }
 
+    /**
+     * Klima cihazları için özel yer tutucu. Klima kumandaları TV'lerden farklı olarak
+     * "tam durum" (full-state) protokolü kullandığından bu marka listesinde YER ALMAZ;
+     * gerçek kodlar [AcCodeLibrary] üzerinden ayrıca yönetilir. Bu sadece Marka Seçimi
+     * akışında görünen bir görüntü/yer tutucudur.
+     */
+    val GENERIC_AC_PLACEHOLDER = BrandIrCodeSet(
+        brandKey = "generic_ac",
+        displayNameEn = "Jenerik Klima (Örnek Profil)",
+        displayNameLocal = "58 gerçek kod · Soğutma/Isıtma 17-25°C · Düşük/Orta/Yüksek fan",
+        protocol = IrProtocol.NEC,
+        verified = true,
+        address = 0,
+        commands = emptyMap()
+    )
+
     fun toIrCommand(brand: BrandIrCodeSet, button: RemoteButton): IrCommand? {
         val commandByte = brand.commands[button] ?: return null
         return IrCommand(

@@ -22,8 +22,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.atakolstudio.sure.data.ir.AcFanSpeed
+import com.atakolstudio.sure.data.ir.AcMode
 import com.atakolstudio.sure.data.ir.RemoteButton
+import com.atakolstudio.sure.domain.model.DeviceType
 import com.atakolstudio.sure.ui.components.RemoteIconButton
 import com.atakolstudio.sure.ui.components.RemoteTextButton
 
@@ -35,8 +39,6 @@ fun RemoteScreen(
 ) {
     val state by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
-    var numpadExpanded by remember { mutableStateOf(false) }
-    val scrollState = rememberScrollState()
 
     LaunchedEffect(state.lastMessage) {
         state.lastMessage?.let {
@@ -72,19 +74,16 @@ fun RemoteScreen(
             return@Scaffold
         }
 
-        Column(
-            modifier = Modifier
-                .padding(padding)
-                .fillMaxSize()
-                .verticalScroll(scrollState)
-                .padding(horizontal = 20.dp, vertical = 12.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
+        Box(Modifier.padding(padding).fillMaxSize()) {
             if (!state.hasIrHardware) {
                 Surface(
                     color = MaterialTheme.colorScheme.errorContainer,
                     shape = RoundedCornerShape(14.dp),
-                    modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .fillMaxWidth()
+                        .padding(16.dp)
+                        .zIndex(1f)
                 ) {
                     Text(
                         "Bu cihazda kızılötesi (IR) verici bulunmuyor. Sinyaller gönderilemeyecek.",
@@ -94,92 +93,289 @@ fun RemoteScreen(
                 }
             }
 
-            // Güç butonu
+            when (state.deviceType) {
+                DeviceType.AC -> AcRemoteLayout(state = state, viewModel = viewModel)
+                else -> TvLikeRemoteLayout(state = state, viewModel = viewModel)
+            }
+        }
+    }
+}
+
+// =========================================================================
+// KLİMA (AC) — sıcaklık + mod + fan hızı tabanlı, TV'den tamamen farklı arayüz
+// =========================================================================
+
+@Composable
+private fun AcRemoteLayout(state: RemoteUiState, viewModel: RemoteViewModel) {
+    val scrollState = rememberScrollState()
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(scrollState)
+            .padding(horizontal = 24.dp, vertical = 20.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Spacer(Modifier.height(8.dp))
+
+        // Durum göstergesi
+        Surface(
+            shape = RoundedCornerShape(20.dp),
+            color = if (state.acIsOn) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surfaceVariant
+        ) {
+            Text(
+                if (state.acIsOn) "AÇIK" else "KAPALI",
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.Bold,
+                color = if (state.acIsOn) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+
+        Spacer(Modifier.height(24.dp))
+
+        // Sıcaklık göstergesi + step'leri
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(24.dp)) {
             RemoteIconButton(
-                icon = Icons.Filled.PowerSettingsNew,
-                contentDescription = "Güç",
-                onClick = { viewModel.sendCommand(RemoteButton.POWER) },
-                size = 76.dp,
-                backgroundColor = MaterialTheme.colorScheme.error,
-                iconTint = Color.White
+                icon = Icons.Filled.Remove,
+                contentDescription = "Sıcaklığı Azalt",
+                onClick = { viewModel.acDecreaseTemperature() },
+                size = 64.dp
             )
-
-            Spacer(Modifier.height(20.dp))
-
-            // Menü / Giriş / Ana Sayfa satırı
-            Row(horizontalArrangement = Arrangement.spacedBy(28.dp)) {
-                RemoteIconButton(Icons.Filled.Menu, "Menü", { viewModel.sendCommand(RemoteButton.MENU) })
-                RemoteIconButton(Icons.Filled.Home, "Akıllı Ana Sayfa", { viewModel.sendCommand(RemoteButton.HOME) })
-                RemoteIconButton(Icons.Filled.Input, "Giriş", { viewModel.sendCommand(RemoteButton.INPUT) })
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    "${state.acTemperature}°",
+                    style = MaterialTheme.typography.displayLarge,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    "${viewModel.acTemperatureRange.first}–${viewModel.acTemperatureRange.last}°C aralığı",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f)
+                )
             }
-
-            Spacer(Modifier.height(24.dp))
-
-            // D-Pad
-            DPad(
-                onUp = { viewModel.sendCommand(RemoteButton.UP) },
-                onDown = { viewModel.sendCommand(RemoteButton.DOWN) },
-                onLeft = { viewModel.sendCommand(RemoteButton.LEFT) },
-                onRight = { viewModel.sendCommand(RemoteButton.RIGHT) },
-                onOk = { viewModel.sendCommand(RemoteButton.OK) }
-            )
-
-            Spacer(Modifier.height(12.dp))
-
             RemoteIconButton(
-                icon = Icons.Filled.ArrowBackIosNew,
-                contentDescription = "Çıkış",
-                onClick = { viewModel.sendCommand(RemoteButton.BACK) }
+                icon = Icons.Filled.Add,
+                contentDescription = "Sıcaklığı Artır",
+                onClick = { viewModel.acIncreaseTemperature() },
+                size = 64.dp
             )
+        }
 
-            Spacer(Modifier.height(24.dp))
+        Spacer(Modifier.height(32.dp))
 
-            // Ses ve Kanal kontrolü
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly
-            ) {
-                VerticalRocker(
-                    label = "SES",
-                    onUp = { viewModel.sendCommand(RemoteButton.VOLUME_UP) },
-                    onDown = { viewModel.sendCommand(RemoteButton.VOLUME_DOWN) },
-                    middleIcon = Icons.Filled.VolumeOff,
-                    onMiddleClick = { viewModel.sendCommand(RemoteButton.MUTE) }
-                )
-                VerticalRocker(
-                    label = "KANAL",
-                    onUp = { viewModel.sendCommand(RemoteButton.CHANNEL_UP) },
-                    onDown = { viewModel.sendCommand(RemoteButton.CHANNEL_DOWN) }
-                )
-            }
+        // Mod seçimi
+        Text("MOD", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f))
+        Spacer(Modifier.height(10.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            AcModeChip(label = "Soğutma", icon = Icons.Filled.AcUnit, selected = state.acMode == AcMode.COOL) { viewModel.acSetMode(AcMode.COOL) }
+            AcModeChip(label = "Isıtma", icon = Icons.Filled.WbSunny, selected = state.acMode == AcMode.HEAT) { viewModel.acSetMode(AcMode.HEAT) }
+            AcModeChip(label = "Fan", icon = Icons.Filled.Air, selected = state.acMode == AcMode.FAN) { viewModel.acSetMode(AcMode.FAN) }
+        }
 
-            Spacer(Modifier.height(24.dp))
+        Spacer(Modifier.height(28.dp))
 
-            // Renkli tuşlar
-            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                ColorKey(Color(0xFFE53935)) { viewModel.sendCommand(RemoteButton.RED) }
-                ColorKey(Color(0xFF43A047)) { viewModel.sendCommand(RemoteButton.GREEN) }
-                ColorKey(Color(0xFFFDD835)) { viewModel.sendCommand(RemoteButton.YELLOW) }
-                ColorKey(Color(0xFF1E88E5)) { viewModel.sendCommand(RemoteButton.BLUE) }
-            }
+        // Fan hızı seçimi
+        Text("FAN HIZI", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f))
+        Spacer(Modifier.height(10.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            AcFanChip(label = "Düşük", selected = state.acFanSpeed == AcFanSpeed.LOW) { viewModel.acSetFanSpeed(AcFanSpeed.LOW) }
+            AcFanChip(label = "Orta", selected = state.acFanSpeed == AcFanSpeed.MED) { viewModel.acSetFanSpeed(AcFanSpeed.MED) }
+            AcFanChip(label = "Yüksek", selected = state.acFanSpeed == AcFanSpeed.HIGH) { viewModel.acSetFanSpeed(AcFanSpeed.HIGH) }
+        }
 
+        Spacer(Modifier.height(40.dp))
+
+        // Güç (kapat) butonu
+        RemoteIconButton(
+            icon = Icons.Filled.PowerSettingsNew,
+            contentDescription = "Kapat",
+            onClick = { viewModel.acPowerOff() },
+            size = 72.dp,
+            backgroundColor = MaterialTheme.colorScheme.error,
+            iconTint = Color.White
+        )
+        Spacer(Modifier.height(8.dp))
+        Text("Kapat", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f))
+
+        Spacer(Modifier.height(20.dp))
+
+        Surface(
+            shape = RoundedCornerShape(14.dp),
+            color = MaterialTheme.colorScheme.surfaceVariant,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(
+                "Bu jenerik/örnek klima profili, yaygın bir OEM klima modülünün gerçek " +
+                    "kodlarını kullanır. Cihazınız tepki vermezse, marka-özel klima desteği " +
+                    "henüz eklenmemiş olabilir.",
+                modifier = Modifier.padding(14.dp),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+            )
+        }
+
+        Spacer(Modifier.height(24.dp))
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun AcModeChip(label: String, icon: androidx.compose.ui.graphics.vector.ImageVector, selected: Boolean, onClick: () -> Unit) {
+    FilterChip(
+        selected = selected,
+        onClick = onClick,
+        label = { Text(label) },
+        leadingIcon = { Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp)) }
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun AcFanChip(label: String, selected: Boolean, onClick: () -> Unit) {
+    FilterChip(selected = selected, onClick = onClick, label = { Text(label) })
+}
+
+// =========================================================================
+// TV / Set-üstü kutu / AV Alıcısı / Ortam Yayıncısı / Disk Oynatıcı / Projektör
+// / Ev Otomasyonu — ortak D-pad + ses/kanal tabanlı arayüz
+// =========================================================================
+
+@Composable
+private fun TvLikeRemoteLayout(state: RemoteUiState, viewModel: RemoteViewModel) {
+    var numpadExpanded by remember { mutableStateOf(false) }
+    var extraExpanded by remember { mutableStateOf(false) }
+    val scrollState = rememberScrollState()
+
+    val mappedButtons = state.brand?.commands?.keys ?: emptySet()
+    val extraButtons = listOf(
+        RemoteButton.SETTINGS to "Ayarlar",
+        RemoteButton.PLAY_PAUSE to "Oynat/Duraklat",
+        RemoteButton.STOP to "Durdur",
+        RemoteButton.REWIND to "Geri Sar",
+        RemoteButton.FAST_FORWARD to "İleri Sar"
+    ).filter { it.first in mappedButtons }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(scrollState)
+            .padding(horizontal = 20.dp, vertical = 12.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        RemoteIconButton(
+            icon = Icons.Filled.PowerSettingsNew,
+            contentDescription = "Güç",
+            onClick = { viewModel.sendCommand(RemoteButton.POWER) },
+            size = 76.dp,
+            backgroundColor = MaterialTheme.colorScheme.error,
+            iconTint = Color.White
+        )
+
+        Spacer(Modifier.height(20.dp))
+
+        Row(horizontalArrangement = Arrangement.spacedBy(28.dp)) {
+            RemoteIconButton(Icons.Filled.Menu, "Menü", { viewModel.sendCommand(RemoteButton.MENU) })
+            RemoteIconButton(Icons.Filled.Home, "Akıllı Ana Sayfa", { viewModel.sendCommand(RemoteButton.HOME) })
+            RemoteIconButton(Icons.Filled.Input, "Giriş", { viewModel.sendCommand(RemoteButton.INPUT) })
+        }
+
+        Spacer(Modifier.height(24.dp))
+
+        DPad(
+            onUp = { viewModel.sendCommand(RemoteButton.UP) },
+            onDown = { viewModel.sendCommand(RemoteButton.DOWN) },
+            onLeft = { viewModel.sendCommand(RemoteButton.LEFT) },
+            onRight = { viewModel.sendCommand(RemoteButton.RIGHT) },
+            onOk = { viewModel.sendCommand(RemoteButton.OK) }
+        )
+
+        Spacer(Modifier.height(12.dp))
+
+        RemoteIconButton(
+            icon = Icons.Filled.ArrowBackIosNew,
+            contentDescription = "Çıkış",
+            onClick = { viewModel.sendCommand(RemoteButton.BACK) }
+        )
+
+        Spacer(Modifier.height(24.dp))
+
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+            VerticalRocker(
+                label = "SES",
+                onUp = { viewModel.sendCommand(RemoteButton.VOLUME_UP) },
+                onDown = { viewModel.sendCommand(RemoteButton.VOLUME_DOWN) },
+                middleIcon = Icons.Filled.VolumeOff,
+                onMiddleClick = { viewModel.sendCommand(RemoteButton.MUTE) }
+            )
+            VerticalRocker(
+                label = "KANAL",
+                onUp = { viewModel.sendCommand(RemoteButton.CHANNEL_UP) },
+                onDown = { viewModel.sendCommand(RemoteButton.CHANNEL_DOWN) }
+            )
+        }
+
+        Spacer(Modifier.height(24.dp))
+
+        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            ColorKey(Color(0xFFE53935)) { viewModel.sendCommand(RemoteButton.RED) }
+            ColorKey(Color(0xFF43A047)) { viewModel.sendCommand(RemoteButton.GREEN) }
+            ColorKey(Color(0xFFFDD835)) { viewModel.sendCommand(RemoteButton.YELLOW) }
+            ColorKey(Color(0xFF1E88E5)) { viewModel.sendCommand(RemoteButton.BLUE) }
+        }
+
+        if (extraButtons.isNotEmpty()) {
             Spacer(Modifier.height(20.dp))
-
-            TextButton(onClick = { numpadExpanded = !numpadExpanded }) {
-                Text(if (numpadExpanded) "Sayısal Tuş Takımını Gizle" else "Sayısal Tuş Takımını Göster")
+            TextButton(onClick = { extraExpanded = !extraExpanded }) {
+                Text(if (extraExpanded) "Diğer Fonksiyonları Gizle" else "Diğer Fonksiyonlar")
                 Icon(
-                    imageVector = if (numpadExpanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                    imageVector = if (extraExpanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
                     contentDescription = null
                 )
             }
-
-            AnimatedVisibility(visible = numpadExpanded, enter = expandVertically(), exit = shrinkVertically()) {
-                NumPad(onDigit = { digit -> viewModel.sendCommand(digitToButton(digit)) })
+            AnimatedVisibility(visible = extraExpanded, enter = expandVertically(), exit = shrinkVertically()) {
+                Row(horizontalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.padding(top = 8.dp)) {
+                    extraButtons.forEach { (button, label) ->
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            RemoteIconButton(
+                                icon = iconForExtraButton(button),
+                                contentDescription = label,
+                                onClick = { viewModel.sendCommand(button) },
+                                size = 48.dp
+                            )
+                            Spacer(Modifier.height(4.dp))
+                            Text(label, style = MaterialTheme.typography.labelSmall)
+                        }
+                    }
+                }
             }
-
-            Spacer(Modifier.height(24.dp))
         }
+
+        Spacer(Modifier.height(20.dp))
+
+        TextButton(onClick = { numpadExpanded = !numpadExpanded }) {
+            Text(if (numpadExpanded) "Sayısal Tuş Takımını Gizle" else "Sayısal Tuş Takımını Göster")
+            Icon(
+                imageVector = if (numpadExpanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                contentDescription = null
+            )
+        }
+
+        AnimatedVisibility(visible = numpadExpanded, enter = expandVertically(), exit = shrinkVertically()) {
+            NumPad(onDigit = { digit -> viewModel.sendCommand(digitToButton(digit)) })
+        }
+
+        Spacer(Modifier.height(24.dp))
     }
+}
+
+private fun iconForExtraButton(button: RemoteButton): androidx.compose.ui.graphics.vector.ImageVector = when (button) {
+    RemoteButton.SETTINGS -> Icons.Filled.Settings
+    RemoteButton.PLAY_PAUSE -> Icons.Filled.PlayArrow
+    RemoteButton.STOP -> Icons.Filled.Stop
+    RemoteButton.REWIND -> Icons.Filled.FastRewind
+    RemoteButton.FAST_FORWARD -> Icons.Filled.FastForward
+    else -> Icons.Filled.Circle
 }
 
 private fun digitToButton(digit: Int): RemoteButton = when (digit) {

@@ -13,6 +13,9 @@ const val CUSTOM_BRAND_KEY = "custom"
  *   yeniden olusturulur.
  */
 fun SavedDeviceEntity.resolveBrandIrCodeSet(): BrandIrCodeSet? {
+    if (brandKey == "generic_ac") {
+        return BrandIrDatabase.GENERIC_AC_PLACEHOLDER
+    }
     if (brandKey != CUSTOM_BRAND_KEY) {
         return BrandIrDatabase.findByKey(brandKey)
     }

@@ -29,6 +29,27 @@ class IrTransmitter @Inject constructor(
     val hasIrEmitter: Boolean
         get() = irManager?.hasIrEmitter() == true
 
+    /**
+     * Önceden yakalanmış, ham darbe dizisini (mikrosaniye) doğrudan gönderir.
+     * Klima gibi "tam durum" (full-state) protokollerinde her tuş, o anki tüm
+     * durumu (sıcaklık+mod+fan hızı) tek seferde kodladığından, bunlar basit bir
+     * protokol/adres/komut üçlüsüyle ifade edilemez; gerçek bir kumandadan
+     * yakalanmış tam darbe dizisi olarak saklanıp aynen tekrar oynatılır.
+     */
+    fun sendRawPulses(frequencyHz: Int, pattern: IntArray): IrTransmitResult {
+        val manager = irManager ?: return IrTransmitResult.NoIrHardware
+        if (!manager.hasIrEmitter()) return IrTransmitResult.NoIrHardware
+
+        return try {
+            manager.transmit(frequencyHz, pattern)
+            IrTransmitResult.Success
+        } catch (e: UnsupportedOperationException) {
+            IrTransmitResult.FrequencyNotSupported
+        } catch (e: Exception) {
+            IrTransmitResult.Error(e.message ?: "Bilinmeyen IR gonderim hatasi")
+        }
+    }
+
     /** Bilinen bir marka + tus kombinasyonunu gonderir. */
     fun send(brand: BrandIrCodeSet, button: RemoteButton): IrTransmitResult {
         val irCommand = BrandIrDatabase.toIrCommand(brand, button)
