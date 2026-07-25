@@ -9,6 +9,9 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
 
+    <!-- Uzaktan kumanda ekranı açıkken telefonun kararmasını engellemek için -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+
     <!-- Cihazın IR blaster donanımı olmasa da uygulamanın kurulabilmesi için false -->
     <uses-feature
         android:name="android.hardware.consumerir"
@@ -22,12 +25,13 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.SURE"
+        android:enableOnBackInvokedCallback="true"
         tools:targetApi="34">
 
         <activity
             android:name=".MainActivity"
             android:exported="true"
-            android:theme="@style/Theme.SURE"
+            android:theme="@style/Theme.SURE.Splash"
             android:configChanges="orientation|screenSize|keyboardHidden">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

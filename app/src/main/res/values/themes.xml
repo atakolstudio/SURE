@@ -1,4 +1,11 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- Android 12+ Splash Screen API teması -->
+    <style name="Theme.SURE.Splash" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/sure_background_light</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_sure_logo</item>
+        <item name="postSplashScreenTheme">@style/Theme.SURE</item>
+    </style>
+
     <!-- Compose, kendi Material3 renk şemasını (SureTheme) uygular. Bu XML tema,
          Compose devreye girmeden önceki (splash / ilk çizim) durum için temel sağlar. -->
     <style name="Theme.SURE" parent="android:Theme.Material.Light.NoActionBar">

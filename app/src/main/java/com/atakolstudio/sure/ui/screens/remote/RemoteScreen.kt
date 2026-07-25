@@ -1,8 +1,14 @@
 package com.atakolstudio.sure.ui.screens.remote
 
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -19,7 +25,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
@@ -39,6 +47,10 @@ fun RemoteScreen(
 ) {
     val state by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
+
+    // Kumandayı kullanırken telefon ekranı kararıp kilitlenmesin — gerçek bir
+    // uzaktan kumanda kullanırken bu son derece can sıkıcı olurdu.
+    KeepScreenOn()
 
     LaunchedEffect(state.lastMessage) {
         state.lastMessage?.let {
@@ -140,14 +152,27 @@ private fun AcRemoteLayout(state: RemoteUiState, viewModel: RemoteViewModel) {
                 icon = Icons.Filled.Remove,
                 contentDescription = "Sıcaklığı Azalt",
                 onClick = { viewModel.acDecreaseTemperature() },
-                size = 64.dp
+                size = 64.dp,
+                repeatable = true
             )
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(
-                    "${state.acTemperature}°",
-                    style = MaterialTheme.typography.displayLarge,
-                    fontWeight = FontWeight.Bold
-                )
+                AnimatedContent(
+                    targetState = state.acTemperature,
+                    transitionSpec = {
+                        if (targetState > initialState) {
+                            (slideInVertically { h -> h } + fadeIn()) togetherWith (slideOutVertically { h -> -h } + fadeOut())
+                        } else {
+                            (slideInVertically { h -> -h } + fadeIn()) togetherWith (slideOutVertically { h -> h } + fadeOut())
+                        }
+                    },
+                    label = "acTemperature"
+                ) { temp ->
+                    Text(
+                        "$temp°",
+                        style = MaterialTheme.typography.displayLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
                 Text(
                     "${viewModel.acTemperatureRange.first}–${viewModel.acTemperatureRange.last}°C aralığı",
                     style = MaterialTheme.typography.labelSmall,
@@ -158,7 +183,8 @@ private fun AcRemoteLayout(state: RemoteUiState, viewModel: RemoteViewModel) {
                 icon = Icons.Filled.Add,
                 contentDescription = "Sıcaklığı Artır",
                 onClick = { viewModel.acIncreaseTemperature() },
-                size = 64.dp
+                size = 64.dp,
+                repeatable = true
             )
         }
 
@@ -191,6 +217,7 @@ private fun AcRemoteLayout(state: RemoteUiState, viewModel: RemoteViewModel) {
             icon = Icons.Filled.PowerSettingsNew,
             contentDescription = "Kapat",
             onClick = { viewModel.acPowerOff() },
+            modifier = Modifier.shadow(10.dp, CircleShape, spotColor = MaterialTheme.colorScheme.error),
             size = 72.dp,
             backgroundColor = MaterialTheme.colorScheme.error,
             iconTint = Color.White
@@ -267,6 +294,7 @@ private fun TvLikeRemoteLayout(state: RemoteUiState, viewModel: RemoteViewModel)
             icon = Icons.Filled.PowerSettingsNew,
             contentDescription = "Güç",
             onClick = { viewModel.sendCommand(RemoteButton.POWER) },
+            modifier = Modifier.shadow(10.dp, CircleShape, spotColor = MaterialTheme.colorScheme.error),
             size = 76.dp,
             backgroundColor = MaterialTheme.colorScheme.error,
             iconTint = Color.White
@@ -427,13 +455,13 @@ private fun VerticalRocker(
                 .clip(RoundedCornerShape(28.dp))
                 .background(MaterialTheme.colorScheme.surfaceVariant)
         ) {
-            RemoteIconButton(Icons.Filled.Add, "$label Artır", onUp, backgroundColor = Color.Transparent)
+            RemoteIconButton(Icons.Filled.Add, "$label Artır", onUp, backgroundColor = Color.Transparent, repeatable = true)
             if (middleIcon != null && onMiddleClick != null) {
                 RemoteIconButton(middleIcon, "$label Sessiz", onMiddleClick, backgroundColor = Color.Transparent, size = 44.dp)
             } else {
                 Spacer(Modifier.height(8.dp))
             }
-            RemoteIconButton(Icons.Filled.Remove, "$label Azalt", onDown, backgroundColor = Color.Transparent)
+            RemoteIconButton(Icons.Filled.Remove, "$label Azalt", onDown, backgroundColor = Color.Transparent, repeatable = true)
         }
     }
 }
@@ -463,5 +491,15 @@ private fun NumPad(onDigit: (Int) -> Unit) {
         }
         item { Spacer(Modifier) }
         item { RemoteTextButton(text = "0", onClick = { onDigit(0) }, size = 60.dp) }
+    }
+}
+
+/** Kumandayı kullanırken telefon ekranının kararıp kilitlenmesini engeller. */
+@Composable
+private fun KeepScreenOn() {
+    val view = LocalView.current
+    DisposableEffect(view) {
+        view.keepScreenOn = true
+        onDispose { view.keepScreenOn = false }
     }
 }
