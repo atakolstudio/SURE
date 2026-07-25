@@ -168,6 +168,41 @@ Hâlâ jenerik kod kullanan markalar (Hisense, TCL, Changhong, Konka, Skyworth, 
 Arçelik, Panasonic) için LIRC veritabanında doğrudan bir karşılık bulunamadı veya
 desteklenmeyen bir protokol (Thomson-özel, Emerson, Aiwa, RECS80 vb.) kullanıyordu.
 
+## Cihaz Türüne Özel Arayüzler
+
+TV ve klima kumandaları **mimarî olarak tamamen farklıdır**:
+
+- **TV/Set-üstü kutu/AVR/vb.**: Her tuş, bağımsız kısa bir kod gönderir
+  (protokol + adres + komut). Ses artır ile kanal değiştirmenin birbiriyle ilgisi yoktur.
+- **Klima**: Her tuş basımı, o anki **TÜM durumu** (sıcaklık + mod + fan hızı) TEK
+  seferde, uzun bir sinyalde kodlar ("tam durum" / full-state protokolü). Yani
+  "sıcaklık artır" aslında "şu anki mod ve fan hızıyla, 1 derece daha sıcak durumun
+  TAMAMINI yeniden gönder" anlamına gelir.
+
+Bu yüzden `RemoteScreen`, `state.deviceType`'a göre tamamen farklı iki arayüz gösterir:
+
+- `TvLikeRemoteLayout`: D-pad + ses/kanal + renkli tuşlar + sayısal tuş takımı +
+  markanın sahip olduğu ekstra tuşlar için genişletilebilir "Diğer Fonksiyonlar" bölümü
+  (SETTINGS, PLAY/PAUSE, STOP, REWIND, FAST FORWARD — önceden veride vardı ama
+  arayüzde gösterilmiyordu, artık gösteriliyor).
+- `AcRemoteLayout`: Büyük sıcaklık göstergesi + artır/azalt, Mod seçimi (Soğutma/
+  Isıtma/Fan çipleri), Fan Hızı seçimi (Düşük/Orta/Yüksek çipleri), ayrı bir Kapat butonu.
+
+### Klima (AC) Kod Kaynağı
+
+Klima kodları da LIRC açık kaynak veritabanından (`hokkaido` jenerik klima modülü)
+alınmıştır — **58 gerçek, yakalanmış tam-durum kodu** (Soğutma/Isıtma × 17-25°C ×
+Düşük/Orta/Yüksek fan + Kapat). Bu kodlar basit protokol/adres/komut modeliyle ifade
+edilemediğinden, `assets/generic_ac_codes.json` içinde **ham darbe dizileri** (mikrosaniye
+cinsinden, gerçek kumandadan Pronto Hex formatında yakalanıp dönüştürülmüş) olarak
+saklanır ve `AcCodeLibrary` + `IrTransmitter.sendRawPulses()` ile gönderilir.
+
+Bu, TEK bir jenerik/örnek profildir — birçok ucuz/OEM klimada aynı modül kullanılır,
+ama garanti değildir. **Marka-özel klima desteği** (Daikin, Mitsubishi, Gree, LG gibi
+büyük markaların kendi özel kodlama algoritmaları) gelecekte ayrı ayrı eklenmesi
+gereken, çok daha büyük bir iştir — her marka için ilgili açık kaynak projelerinden
+(ör. IRremoteESP8266) durum-kodlama mantığının okunup uyarlanması gerekir.
+
 ## İzinler
 
 | İzin | Amaç |
