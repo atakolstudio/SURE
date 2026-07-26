@@ -11,7 +11,6 @@ import com.atakolstudio.sure.data.local.entity.SavedDeviceEntity
 import com.atakolstudio.sure.testutil.FakeDeviceRepository
 import com.atakolstudio.sure.testutil.MainDispatcherRule
 import com.google.common.truth.Truth.assertThat
-import io.mockk.any
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify

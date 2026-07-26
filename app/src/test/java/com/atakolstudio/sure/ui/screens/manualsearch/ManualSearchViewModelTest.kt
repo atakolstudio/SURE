@@ -12,7 +12,6 @@ import com.atakolstudio.sure.data.ir.RemoteButton
 import com.atakolstudio.sure.testutil.FakeDeviceRepository
 import com.atakolstudio.sure.testutil.MainDispatcherRule
 import com.google.common.truth.Truth.assertThat
-import io.mockk.any
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.test.advanceUntilIdle
