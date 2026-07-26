@@ -28,21 +28,7 @@ jobs:
         run: chmod +x gradlew
 
       - name: Run Unit Tests
-        run: |
-          set -o pipefail
-          ./gradlew testDebugUnitTest --stacktrace 2>&1 | tee test_output.log
-        continue-on-error: true
-        id: unit_tests
-
-      - name: Report failures to commit comment
-        if: steps.unit_tests.outcome == 'failure'
-        env:
-          GIST_TOKEN: ${{ secrets.TEMP_DEBUG_GIST_TOKEN }}
-        run: python3 .github/scripts/report_test_failures.py
-
-      - name: Fail job if tests failed
-        if: steps.unit_tests.outcome == 'failure'
-        run: exit 1
+        run: ./gradlew testDebugUnitTest --stacktrace
 
       - name: Upload test reports
         if: always()
