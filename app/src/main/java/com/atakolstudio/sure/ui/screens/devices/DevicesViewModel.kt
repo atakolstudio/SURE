@@ -17,7 +17,7 @@ class DevicesViewModel @Inject constructor(
 ) : ViewModel() {
 
     val devices: StateFlow<List<SavedDeviceEntity>> = repository.observeDevices()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     fun renameDevice(id: Long, newName: String) {
         viewModelScope.launch { repository.renameDevice(id, newName) }

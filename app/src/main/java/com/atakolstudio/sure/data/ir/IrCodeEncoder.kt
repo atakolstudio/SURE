@@ -107,62 +107,114 @@ object IrCodeEncoder {
     }
 
     // ---------------------------------------------------------------------
-    // Philips RC5 — Manchester kodlama, 889us birim, 14 bit (2 start + toggle + 5 adres + 6 komut)
-    // Basitlik için toggle biti 0 sabitlenmiştir (çoğu alıcı tolere eder).
+    // Philips RC5 — Manchester (bi-phase) kodlama, 889us birim.
+    // 14 bit: start(1) + field/start2(1) + toggle(1) + adres(5) + komut(6, alt bitler).
+    // "Genişletilmiş RC5" kuralına göre field/start2 biti, 7-bitlik komutun en
+    // anlamlı bitinin (MSB) TERSİ olarak kodlanır — böylece 64-127 aralığındaki
+    // komutlar da (birçok gerçek TV kumandasında kullanılır) doğru desteklenir.
+    //
+    // Manchester'da bit=1 → yarı periyotta KAPALI'dan AÇIK'a geçiş (space,mark);
+    // bit=0 → AÇIK'tan KAPALI'ya geçiş (mark,space). Ardışık iki bit sınırında
+    // aynı türden (ikisi de "açık" ya da ikisi de "kapalı") segmentler varsa,
+    // bunlar TEK bir daha uzun darbede birleştirilmelidir — aksi halde
+    // ConsumerIrManager'ın beklediği "sürekli alternatif açık/kapalı" dizisi bozulur.
     // ---------------------------------------------------------------------
     private fun encodeRc5(cmd: IrCommand): IntArray {
         val unit = 889
-        val bits = mutableListOf<Int>()
-        bits += 1 // start bit 1
-        bits += 1 // start bit 2 (RC5 field bit, genelde 1)
-        bits += 0 // toggle bit
-        appendBitsMsbFirst(bits, cmd.address, 5)
-        appendBitsMsbFirst(bits, cmd.command, 6)
 
-        // Manchester: bit 1 -> açık->kapalı geçiş, bit 0 -> kapalı->açık geçiş
-        val pulses = mutableListOf<Int>()
-        var currentlyOn = true // ilk yarı her zaman "açık" ile başlar (start bit 1)
-        pulses += unit // ilk mark
-        for (i in 1 until bits.size) {
-            val bit = bits[i]
+        val commandMsb = (cmd.command shr 6) and 1
+        val fieldBit = commandMsb xor 1 // genişletilmiş komut MSB'sinin tersi
+
+        val bits = mutableListOf<Int>()
+        bits += 1        // start bit 1 (sabit)
+        bits += fieldBit // start bit 2 / field bit
+        bits += 0        // toggle bit
+        appendBitsMsbFirst(bits, cmd.address, 5)
+        appendBitsMsbFirst(bits, cmd.command, 6) // komutun alt 6 biti
+
+        // Her bit icin (isMark, sure) segment cifti uret. bit=1 -> mark,space
+        // (start biti HER ZAMAN 1'dir, bu yuzden dizi mutlaka mark ile baslamalidir —
+        // ConsumerIrManager pattern[0]'in acik/on suresi olmasini sart kosar).
+        // bit=0 -> space,mark.
+        data class Segment(val isMark: Boolean, val duration: Int)
+        val segments = mutableListOf<Segment>()
+        for (bit in bits) {
             if (bit == 1) {
-                pulses += unit // space
-                pulses += unit // mark
+                segments += Segment(isMark = true, duration = unit)  // mark
+                segments += Segment(isMark = false, duration = unit) // space
             } else {
-                pulses += unit
-                pulses += unit
+                segments += Segment(isMark = false, duration = unit) // space
+                segments += Segment(isMark = true, duration = unit)  // mark
             }
         }
-        return pulses.toIntArray()
+
+        // Ardışık aynı-turdeki segmentleri birlestir
+        val merged = mutableListOf<Segment>()
+        for (seg in segments) {
+            val last = merged.lastOrNull()
+            if (last != null && last.isMark == seg.isMark) {
+                merged[merged.lastIndex] = Segment(last.isMark, last.duration + seg.duration)
+            } else {
+                merged += seg
+            }
+        }
+
+        // RC5'in ilk biti (start bit 1) her zaman 1'dir, bu yüzden dizi her zaman
+        // "mark" ile başlar — ConsumerIrManager'ın beklediği format budur.
+        return merged.map { it.duration }.toIntArray()
     }
 
     // ---------------------------------------------------------------------
-    // RC6 — 2666us leader + 889us space + start bit(1) + 3 mode bit + toggle(2x uzunluk) + 8bit adres + 8bit komut
-    // Basitleştirilmiş RC6 mode-0 kodlayıcı.
+    // RC6 — 2666us leader + 889us space + start bit(1) + 3 mode bit + toggle(2x genişlik)
+    // + 8bit adres + 8bit komut. RC5'teki gibi, ardışık aynı-türden (mark/space)
+    // segmentler birleştirilir (bkz. encodeRc5 açıklaması).
     // ---------------------------------------------------------------------
     private fun encodeRc6(cmd: IrCommand): IntArray {
         val unit = 444
-        val pulses = mutableListOf<Int>()
-        pulses += 2666 // leader mark
-        pulses += 889  // leader space
 
-        // Start bit (her zaman 1) - normal genişlik
-        pulses += unit; pulses += unit
+        data class Segment(val isMark: Boolean, val duration: Int)
+        val segments = mutableListOf<Segment>()
 
-        // Mode bits 000
-        repeat(3) { pulses += unit; pulses += unit }
+        segments += Segment(isMark = true, duration = 2666)  // leader mark
+        segments += Segment(isMark = false, duration = 889)  // leader space
 
-        // Toggle bit - çift genişlik (basitleştirilmiş: 0 sabit)
-        pulses += unit * 2; pulses += unit * 2
+        // Start biti her zaman 1 (normal genişlik): mark,space
+        segments += Segment(isMark = true, duration = unit)
+        segments += Segment(isMark = false, duration = unit)
+
+        // Mode bitleri 000 (basitleştirilmiş, mode 0): her biri bit=0 -> space,mark
+        repeat(3) {
+            segments += Segment(isMark = false, duration = unit)
+            segments += Segment(isMark = true, duration = unit)
+        }
+
+        // Toggle biti 0, ÇİFT genişlikte: bit=0 -> space,mark (2x unit)
+        segments += Segment(isMark = false, duration = unit * 2)
+        segments += Segment(isMark = true, duration = unit * 2)
 
         val bits = mutableListOf<Int>()
         appendBitsMsbFirst(bits, cmd.address, 8)
         appendBitsMsbFirst(bits, cmd.command, 8)
         for (bit in bits) {
-            if (bit == 1) { pulses += unit; } else { pulses += unit }
-            pulses += unit
+            if (bit == 1) {
+                segments += Segment(isMark = true, duration = unit)
+                segments += Segment(isMark = false, duration = unit)
+            } else {
+                segments += Segment(isMark = false, duration = unit)
+                segments += Segment(isMark = true, duration = unit)
+            }
         }
-        return pulses.toIntArray()
+
+        val merged = mutableListOf<Segment>()
+        for (seg in segments) {
+            val last = merged.lastOrNull()
+            if (last != null && last.isMark == seg.isMark) {
+                merged[merged.lastIndex] = Segment(last.isMark, last.duration + seg.duration)
+            } else {
+                merged += seg
+            }
+        }
+        return merged.map { it.duration }.toIntArray()
     }
 
     // ---------------------------------------------------------------------

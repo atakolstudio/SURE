@@ -129,18 +129,56 @@ class IrCodeEncoderTest {
     // ------------------------------------------------------------------
 
     @Test
-    fun `RC5 - Manchester kodlamasinda her bit 2 darbe uretir`() {
+    fun `RC5 - dizi her zaman acik (mark) suresiyle baslar`() {
         val pattern = IrCodeEncoder.encode(IrCommand(IrProtocol.RC5, address = 0x00, command = 0x0C))
-        // 14 bit (2 start + 1 toggle + 5 adres + 6 komut) * 2 (Manchester: her bit icin mark+space) = 28
-        assertThat(pattern.size).isEqualTo(28)
+        // Start biti her zaman 1'dir; ConsumerIrManager pattern[0]'in acik suresi
+        // olmasini sart kosar.
+        assertThat(pattern[0]).isEqualTo(889)
     }
 
     @Test
-    fun `RC6 - leader ve start bit yapisi dogru uzunlukta`() {
+    fun `RC5 - tum darbeler pozitif ve 889'un kati`() {
+        val pattern = IrCodeEncoder.encode(IrCommand(IrProtocol.RC5, address = 0x00, command = 0x0C))
+        assertThat(pattern.all { it > 0 && it % 889 == 0 }).isTrue()
+    }
+
+    @Test
+    fun `RC5 - farkli komutlar farkli darbe dizileri uretir (Manchester kodlama duzgun calisiyor)`() {
+        // Bu test, bit degeri ne olursa olsun ayni darbelerin uretildigi bir
+        // Manchester kodlama hatasini yakalamak icin ozellikle yazilmistir.
+        val commandA = IrCodeEncoder.encode(IrCommand(IrProtocol.RC5, address = 0x00, command = 0x0C))
+        val commandB = IrCodeEncoder.encode(IrCommand(IrProtocol.RC5, address = 0x00, command = 0x10))
+        assertThat(commandA).isNotEqualTo(commandB)
+    }
+
+    @Test
+    fun `RC5 - genisletilmis (7 bit) komutlar 64 ve uzeri degerlerde de calisir`() {
+        // Philips veritabanindaki bazi tuslar (ornegin D-pad) 64-127 araligindadir.
+        val extended = IrCodeEncoder.encode(IrCommand(IrProtocol.RC5, address = 0x00, command = 0x50))
+        assertThat(extended).isNotEmpty()
+        assertThat(extended[0]).isEqualTo(889)
+    }
+
+    @Test
+    fun `RC5 - farkli adresler farkli darbe dizileri uretir`() {
+        val brand1 = IrCodeEncoder.encode(IrCommand(IrProtocol.RC5, address = 0x00, command = 0x0C))
+        val brand2 = IrCodeEncoder.encode(IrCommand(IrProtocol.RC5, address = 0x1D, command = 0x0C))
+        assertThat(brand1).isNotEqualTo(brand2)
+    }
+
+    @Test
+    fun `RC6 - dizi lider darbeyle basliyor`() {
         val pattern = IrCodeEncoder.encode(IrCommand(IrProtocol.RC6, address = 0x00, command = 0x0C))
         assertThat(pattern[0]).isEqualTo(2666) // leader mark
         assertThat(pattern[1]).isEqualTo(889)  // leader space
         assertThat(pattern.all { it > 0 }).isTrue()
+    }
+
+    @Test
+    fun `RC6 - farkli komutlar farkli darbe dizileri uretir`() {
+        val commandA = IrCodeEncoder.encode(IrCommand(IrProtocol.RC6, address = 0x00, command = 0x0C))
+        val commandB = IrCodeEncoder.encode(IrCommand(IrProtocol.RC6, address = 0x00, command = 0x99))
+        assertThat(commandA).isNotEqualTo(commandB)
     }
 
     // ------------------------------------------------------------------
@@ -177,6 +215,26 @@ class IrCodeEncoderTest {
         val brand1 = IrCodeEncoder.encode(IrCommand(IrProtocol.NEC, address = 0x04, command = 0x08))
         val brand2 = IrCodeEncoder.encode(IrCommand(IrProtocol.NEC, address = 0x40, command = 0x08))
         assertThat(brand1).isNotEqualTo(brand2)
+    }
+
+    @Test
+    fun `TUM protokollerde iki farkli komut farkli darbe dizisi uretmeli (genel regresyon testi)`() {
+        val testCases = listOf(
+            IrProtocol.NEC to (0x08 to 0x02),
+            IrProtocol.SAMSUNG to (0x02 to 0x07),
+            IrProtocol.SONY_SIRC12 to (0x15 to 0x12),
+            IrProtocol.RC5 to (0x0C to 0x10),
+            IrProtocol.RC6 to (0x0C to 0x99),
+            IrProtocol.PANASONIC to (0x3D to 0x20),
+            IrProtocol.JVC to (0x17 to 0x1C)
+        )
+
+        testCases.forEach { (protocol, commands) ->
+            val (commandA, commandB) = commands
+            val patternA = IrCodeEncoder.encode(IrCommand(protocol, address = 0x01, command = commandA))
+            val patternB = IrCodeEncoder.encode(IrCommand(protocol, address = 0x01, command = commandB))
+            assertThat(patternA).isNotEqualTo(patternB)
+        }
     }
 
     // ------------------------------------------------------------------

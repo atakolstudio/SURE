@@ -40,11 +40,11 @@ class BrandIrDatabaseTest {
     }
 
     @Test
-    fun `RC5 protokolundeki markalarin tum komutlari 6 bit sinirinda (0-63)`() {
+    fun `RC5 protokolundeki markalarin tum komutlari 7 bit sinirinda (0-127, genisletilmis RC5)`() {
         val rc5Brands = BrandIrDatabase.brands.filter { it.protocol == IrProtocol.RC5 }
         rc5Brands.forEach { brand ->
             brand.commands.values.forEach { command ->
-                assertThat(command).isIn(0..63)
+                assertThat(command).isIn(0..127)
             }
         }
     }
