@@ -29,6 +29,18 @@ jobs:
 
       - name: Run Unit Tests
         run: ./gradlew testDebugUnitTest --stacktrace
+        continue-on-error: true
+        id: unit_tests
+
+      - name: Report failures to commit comment
+        if: steps.unit_tests.outcome == 'failure'
+        env:
+          GIST_TOKEN: ${{ secrets.TEMP_DEBUG_GIST_TOKEN }}
+        run: python3 .github/scripts/report_test_failures.py
+
+      - name: Fail job if tests failed
+        if: steps.unit_tests.outcome == 'failure'
+        run: exit 1
 
       - name: Upload test reports
         if: always()
