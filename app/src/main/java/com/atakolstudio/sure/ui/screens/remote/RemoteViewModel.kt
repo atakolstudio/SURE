@@ -60,12 +60,13 @@ class RemoteViewModel @Inject constructor(
         val deviceTypeArg = savedStateHandle.get<String>("deviceType")
         val connectionTypeArg = savedStateHandle.get<String>("connectionType")
 
-        viewModelScope.launch {
-            if (savedDeviceId > 0) {
-                loadSavedDevice(savedDeviceId)
-            } else if (brandKeyArg != null) {
-                loadNewSetup(brandKeyArg, deviceTypeArg, connectionTypeArg)
-            }
+        if (savedDeviceId > 0) {
+            // Room'dan okuma gerektirdiği için (suspend) asenkron yüklenir.
+            viewModelScope.launch { loadSavedDevice(savedDeviceId) }
+        } else if (brandKeyArg != null) {
+            // Saf senkron mantık; gereksiz yere bir sonraki dispatcher tick'ine
+            // ertelenmemesi için doğrudan çağrılır (UI ilk karede zaten dolu görünür).
+            loadNewSetup(brandKeyArg, deviceTypeArg, connectionTypeArg)
         }
 
         _uiState.value = _uiState.value.copy(hasIrHardware = irTransmitter.hasIrEmitter)
