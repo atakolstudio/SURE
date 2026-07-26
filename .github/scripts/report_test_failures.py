@@ -40,8 +40,17 @@ def main():
 
     failures = collect_failures()
     if not failures:
-        print("Basarisiz test bulunamadi (XML bulunamamis olabilir).")
-        return 0
+        # XML sonuclari yoksa (ornegin derleme hatasi nedeniyle testler hic
+        # calismadiysa), ham gradle ciktisinin son kismini kullan.
+        log_path = "test_output.log"
+        if os.path.exists(log_path):
+            with open(log_path, "r", errors="replace") as f:
+                content = f.read()
+            tail = content[-55000:]
+            failures = [f"### Ham Gradle Ciktisi (test XML bulunamadi - muhtemelen derleme hatasi)\n```\n{tail}\n```"]
+        else:
+            print("Basarisiz test bulunamadi ve log dosyasi da yok.")
+            return 0
 
     body = "## Basarisiz Birim Testleri\n\n" + "\n\n".join(failures[:15])
     if len(body) > 60000:
