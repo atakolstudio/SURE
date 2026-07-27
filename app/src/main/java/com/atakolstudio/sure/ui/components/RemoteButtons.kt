@@ -21,6 +21,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -53,6 +54,8 @@ fun RemoteIconButton(
     backgroundColor: Color = MaterialTheme.colorScheme.surfaceVariant,
     iconTint: Color = MaterialTheme.colorScheme.onSurface,
     shape: Shape = CircleShape,
+    /** Verilirse, düz [backgroundColor] yerine bu gradyan kullanılır (ör. güç butonu). */
+    containerBrush: Brush? = null,
     /** true ise, tuş basılı tutulduğunda gerçek kumandalardaki gibi tekrar tekrar tetiklenir
      *  (ör. ses/kanal/sıcaklık artır-azalt tuşları için idealdir). */
     repeatable: Boolean = false
@@ -80,7 +83,10 @@ fun RemoteIconButton(
             .size(size)
             .scale(scale)
             .clip(shape)
-            .background(backgroundColor)
+            .then(
+                if (containerBrush != null) Modifier.background(containerBrush)
+                else Modifier.background(backgroundColor)
+            )
             .clickable(
                 interactionSource = interactionSource,
                 indication = rememberRipple(bounded = true, color = iconTint),

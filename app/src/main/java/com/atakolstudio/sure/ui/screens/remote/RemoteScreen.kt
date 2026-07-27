@@ -9,7 +9,9 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -26,7 +28,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -38,6 +43,10 @@ import com.atakolstudio.sure.data.ir.RemoteButton
 import com.atakolstudio.sure.domain.model.DeviceType
 import com.atakolstudio.sure.ui.components.RemoteIconButton
 import com.atakolstudio.sure.ui.components.RemoteTextButton
+
+// --- Küçük renk yardımcıları: tema rengini gradyan için açıklaştır/koyulaştır ---
+private fun Color.lighten(fraction: Float): Color = lerp(this, Color.White, fraction)
+private fun Color.darken(fraction: Float): Color = lerp(this, Color.Black, fraction)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -59,15 +68,32 @@ fun RemoteScreen(
         }
     }
 
+    val backgroundBrush = Brush.verticalGradient(
+        colors = listOf(
+            MaterialTheme.colorScheme.primary.copy(alpha = 0.06f),
+            MaterialTheme.colorScheme.background
+        ),
+        endY = 900f
+    )
+
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
+        containerColor = Color.Transparent,
         topBar = {
             TopAppBar(
                 title = {
-                    Column {
-                        Text(state.nickname.ifBlank { "Uzaktan Kumanda" }, fontWeight = FontWeight.SemiBold)
-                        state.brand?.let {
-                            Text(it.displayNameEn, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        DeviceAvatar(deviceType = state.deviceType)
+                        Spacer(Modifier.width(12.dp))
+                        Column {
+                            Text(state.nickname.ifBlank { "Uzaktan Kumanda" }, fontWeight = FontWeight.Bold)
+                            state.brand?.let {
+                                Text(
+                                    it.displayNameEn,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                                )
+                            }
                         }
                     }
                 },
@@ -75,7 +101,8 @@ fun RemoteScreen(
                     IconButton(onClick = onBack) {
                         Icon(Icons.Filled.ArrowBack, contentDescription = "Geri")
                     }
-                }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
             )
         }
     ) { padding ->
@@ -86,7 +113,12 @@ fun RemoteScreen(
             return@Scaffold
         }
 
-        Box(Modifier.padding(padding).fillMaxSize()) {
+        Box(
+            Modifier
+                .padding(padding)
+                .fillMaxSize()
+                .background(backgroundBrush)
+        ) {
             if (!state.hasIrHardware) {
                 Surface(
                     color = MaterialTheme.colorScheme.errorContainer,
@@ -113,6 +145,31 @@ fun RemoteScreen(
     }
 }
 
+/** Başlıkta cihaz türünü temsil eden küçük, renkli, gradyanlı bir rozet/avatar. */
+@Composable
+private fun DeviceAvatar(deviceType: DeviceType) {
+    val icon = when (deviceType) {
+        DeviceType.TV -> Icons.Filled.Tv
+        DeviceType.AC -> Icons.Filled.AcUnit
+        DeviceType.SET_TOP_BOX -> Icons.Filled.SettingsInputHdmi
+        DeviceType.AV_RECEIVER -> Icons.Filled.Speaker
+        DeviceType.STREAMING_MEDIA -> Icons.Filled.Cast
+        DeviceType.HOME_AUTOMATION -> Icons.Filled.Home
+        DeviceType.DISC_PLAYER -> Icons.Filled.Album
+        DeviceType.PROJECTOR -> Icons.Filled.Videocam
+    }
+    val primary = MaterialTheme.colorScheme.primary
+    Box(
+        modifier = Modifier
+            .size(38.dp)
+            .clip(CircleShape)
+            .background(Brush.linearGradient(listOf(primary.lighten(0.25f), primary.darken(0.1f)))),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
+    }
+}
+
 // =========================================================================
 // KLİMA (AC) — sıcaklık + mod + fan hızı tabanlı, TV'den tamamen farklı arayüz
 // =========================================================================
@@ -120,6 +177,14 @@ fun RemoteScreen(
 @Composable
 private fun AcRemoteLayout(state: RemoteUiState, viewModel: RemoteViewModel) {
     val scrollState = rememberScrollState()
+    val coolColor = Color(0xFF2196F3)
+    val heatColor = Color(0xFFFF7043)
+    val accentColor = when (state.acMode) {
+        AcMode.COOL -> coolColor
+        AcMode.HEAT -> heatColor
+        AcMode.FAN -> MaterialTheme.colorScheme.primary
+        AcMode.OFF -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
 
     Column(
         modifier = Modifier
@@ -133,28 +198,45 @@ private fun AcRemoteLayout(state: RemoteUiState, viewModel: RemoteViewModel) {
         // Durum göstergesi
         Surface(
             shape = RoundedCornerShape(20.dp),
-            color = if (state.acIsOn) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surfaceVariant
+            color = if (state.acIsOn) accentColor.copy(alpha = 0.14f) else MaterialTheme.colorScheme.surfaceVariant
         ) {
-            Text(
-                if (state.acIsOn) "AÇIK" else "KAPALI",
+            Row(
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
-                style = MaterialTheme.typography.labelLarge,
-                fontWeight = FontWeight.Bold,
-                color = if (state.acIsOn) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-            )
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(8.dp)
+                        .clip(CircleShape)
+                        .background(if (state.acIsOn) accentColor else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f))
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    if (state.acIsOn) "AÇIK" else "KAPALI",
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = if (state.acIsOn) accentColor else MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
 
-        Spacer(Modifier.height(24.dp))
+        Spacer(Modifier.height(28.dp))
 
-        // Sıcaklık göstergesi + step'leri
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(24.dp)) {
-            RemoteIconButton(
-                icon = Icons.Filled.Remove,
-                contentDescription = "Sıcaklığı Azalt",
-                onClick = { viewModel.acDecreaseTemperature() },
-                size = 64.dp,
-                repeatable = true
-            )
+        // Sıcaklık göstergesi — gradyanlı, dairesel kart
+        Box(
+            modifier = Modifier
+                .size(220.dp)
+                .shadow(16.dp, CircleShape, spotColor = accentColor.copy(alpha = 0.5f))
+                .clip(CircleShape)
+                .background(
+                    Brush.radialGradient(
+                        colors = listOf(accentColor.copy(alpha = 0.18f), MaterialTheme.colorScheme.surfaceVariant),
+                        radius = 320f
+                    )
+                )
+                .border(2.dp, accentColor.copy(alpha = 0.35f), CircleShape),
+            contentAlignment = Alignment.Center
+        ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 AnimatedContent(
                     targetState = state.acTemperature,
@@ -170,7 +252,8 @@ private fun AcRemoteLayout(state: RemoteUiState, viewModel: RemoteViewModel) {
                     Text(
                         "$temp°",
                         style = MaterialTheme.typography.displayLarge,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Black,
+                        color = accentColor
                     )
                 }
                 Text(
@@ -179,11 +262,25 @@ private fun AcRemoteLayout(state: RemoteUiState, viewModel: RemoteViewModel) {
                     color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f)
                 )
             }
+        }
+
+        Spacer(Modifier.height(20.dp))
+
+        Row(horizontalArrangement = Arrangement.spacedBy(28.dp)) {
+            RemoteIconButton(
+                icon = Icons.Filled.Remove,
+                contentDescription = "Sıcaklığı Azalt",
+                onClick = { viewModel.acDecreaseTemperature() },
+                modifier = Modifier.shadow(4.dp, CircleShape),
+                size = 60.dp,
+                repeatable = true
+            )
             RemoteIconButton(
                 icon = Icons.Filled.Add,
                 contentDescription = "Sıcaklığı Artır",
                 onClick = { viewModel.acIncreaseTemperature() },
-                size = 64.dp,
+                modifier = Modifier.shadow(4.dp, CircleShape),
+                size = 60.dp,
                 repeatable = true
             )
         }
@@ -191,18 +288,18 @@ private fun AcRemoteLayout(state: RemoteUiState, viewModel: RemoteViewModel) {
         Spacer(Modifier.height(32.dp))
 
         // Mod seçimi
-        Text("MOD", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f))
+        Text("MOD", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f))
         Spacer(Modifier.height(10.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            AcModeChip(label = "Soğutma", icon = Icons.Filled.AcUnit, selected = state.acMode == AcMode.COOL) { viewModel.acSetMode(AcMode.COOL) }
-            AcModeChip(label = "Isıtma", icon = Icons.Filled.WbSunny, selected = state.acMode == AcMode.HEAT) { viewModel.acSetMode(AcMode.HEAT) }
-            AcModeChip(label = "Fan", icon = Icons.Filled.Air, selected = state.acMode == AcMode.FAN) { viewModel.acSetMode(AcMode.FAN) }
+            AcModeChip(label = "Soğutma", icon = Icons.Filled.AcUnit, selected = state.acMode == AcMode.COOL, accentColor = coolColor) { viewModel.acSetMode(AcMode.COOL) }
+            AcModeChip(label = "Isıtma", icon = Icons.Filled.WbSunny, selected = state.acMode == AcMode.HEAT, accentColor = heatColor) { viewModel.acSetMode(AcMode.HEAT) }
+            AcModeChip(label = "Fan", icon = Icons.Filled.Air, selected = state.acMode == AcMode.FAN, accentColor = MaterialTheme.colorScheme.primary) { viewModel.acSetMode(AcMode.FAN) }
         }
 
         Spacer(Modifier.height(28.dp))
 
         // Fan hızı seçimi
-        Text("FAN HIZI", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f))
+        Text("FAN HIZI", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f))
         Spacer(Modifier.height(10.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             AcFanChip(label = "Düşük", selected = state.acFanSpeed == AcFanSpeed.LOW) { viewModel.acSetFanSpeed(AcFanSpeed.LOW) }
@@ -212,14 +309,16 @@ private fun AcRemoteLayout(state: RemoteUiState, viewModel: RemoteViewModel) {
 
         Spacer(Modifier.height(40.dp))
 
-        // Güç (kapat) butonu
+        // Güç (kapat) butonu — gradyanlı
         RemoteIconButton(
             icon = Icons.Filled.PowerSettingsNew,
             contentDescription = "Kapat",
             onClick = { viewModel.acPowerOff() },
-            modifier = Modifier.shadow(10.dp, CircleShape, spotColor = MaterialTheme.colorScheme.error),
+            modifier = Modifier.shadow(14.dp, CircleShape, spotColor = MaterialTheme.colorScheme.error),
             size = 72.dp,
-            backgroundColor = MaterialTheme.colorScheme.error,
+            containerBrush = Brush.radialGradient(
+                listOf(MaterialTheme.colorScheme.error.lighten(0.15f), MaterialTheme.colorScheme.error.darken(0.1f))
+            ),
             iconTint = Color.White
         )
         Spacer(Modifier.height(8.dp))
@@ -232,14 +331,22 @@ private fun AcRemoteLayout(state: RemoteUiState, viewModel: RemoteViewModel) {
             color = MaterialTheme.colorScheme.surfaceVariant,
             modifier = Modifier.fillMaxWidth()
         ) {
-            Text(
-                "Bu jenerik/örnek klima profili, yaygın bir OEM klima modülünün gerçek " +
-                    "kodlarını kullanır. Cihazınız tepki vermezse, marka-özel klima desteği " +
-                    "henüz eklenmemiş olabilir.",
-                modifier = Modifier.padding(14.dp),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-            )
+            Row(modifier = Modifier.padding(14.dp)) {
+                Icon(
+                    Icons.Filled.Info,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp).padding(top = 2.dp),
+                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    "Bu jenerik/örnek klima profili, yaygın bir OEM klima modülünün gerçek " +
+                        "kodlarını kullanır. Cihazınız tepki vermezse, marka-özel klima desteği " +
+                        "henüz eklenmemiş olabilir.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                )
+            }
         }
 
         Spacer(Modifier.height(24.dp))
@@ -248,12 +355,17 @@ private fun AcRemoteLayout(state: RemoteUiState, viewModel: RemoteViewModel) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun AcModeChip(label: String, icon: androidx.compose.ui.graphics.vector.ImageVector, selected: Boolean, onClick: () -> Unit) {
+private fun AcModeChip(label: String, icon: ImageVector, selected: Boolean, accentColor: Color, onClick: () -> Unit) {
     FilterChip(
         selected = selected,
         onClick = onClick,
         label = { Text(label) },
-        leadingIcon = { Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp)) }
+        leadingIcon = { Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp)) },
+        colors = FilterChipDefaults.filterChipColors(
+            selectedContainerColor = accentColor.copy(alpha = 0.18f),
+            selectedLabelColor = accentColor,
+            selectedLeadingIconColor = accentColor
+        )
     )
 }
 
@@ -290,25 +402,26 @@ private fun TvLikeRemoteLayout(state: RemoteUiState, viewModel: RemoteViewModel)
             .padding(horizontal = 20.dp, vertical = 12.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        val errorColor = MaterialTheme.colorScheme.error
         RemoteIconButton(
             icon = Icons.Filled.PowerSettingsNew,
             contentDescription = "Güç",
             onClick = { viewModel.sendCommand(RemoteButton.POWER) },
-            modifier = Modifier.shadow(10.dp, CircleShape, spotColor = MaterialTheme.colorScheme.error),
-            size = 76.dp,
-            backgroundColor = MaterialTheme.colorScheme.error,
+            modifier = Modifier.shadow(16.dp, CircleShape, spotColor = errorColor.copy(alpha = 0.7f)),
+            size = 78.dp,
+            containerBrush = Brush.radialGradient(listOf(errorColor.lighten(0.15f), errorColor.darken(0.12f))),
             iconTint = Color.White
         )
 
-        Spacer(Modifier.height(20.dp))
+        Spacer(Modifier.height(24.dp))
 
         Row(horizontalArrangement = Arrangement.spacedBy(28.dp)) {
-            RemoteIconButton(Icons.Filled.Menu, "Menü", { viewModel.sendCommand(RemoteButton.MENU) })
-            RemoteIconButton(Icons.Filled.Home, "Akıllı Ana Sayfa", { viewModel.sendCommand(RemoteButton.HOME) })
-            RemoteIconButton(Icons.Filled.Input, "Giriş", { viewModel.sendCommand(RemoteButton.INPUT) })
+            TintedIconButton(Icons.Filled.Menu, "Menü", MaterialTheme.colorScheme.primary) { viewModel.sendCommand(RemoteButton.MENU) }
+            TintedIconButton(Icons.Filled.Home, "Akıllı Ana Sayfa", MaterialTheme.colorScheme.primary) { viewModel.sendCommand(RemoteButton.HOME) }
+            TintedIconButton(Icons.Filled.Input, "Giriş", MaterialTheme.colorScheme.primary) { viewModel.sendCommand(RemoteButton.INPUT) }
         }
 
-        Spacer(Modifier.height(24.dp))
+        Spacer(Modifier.height(28.dp))
 
         DPad(
             onUp = { viewModel.sendCommand(RemoteButton.UP) },
@@ -318,15 +431,16 @@ private fun TvLikeRemoteLayout(state: RemoteUiState, viewModel: RemoteViewModel)
             onOk = { viewModel.sendCommand(RemoteButton.OK) }
         )
 
-        Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(14.dp))
 
         RemoteIconButton(
             icon = Icons.Filled.ArrowBackIosNew,
             contentDescription = "Çıkış",
-            onClick = { viewModel.sendCommand(RemoteButton.BACK) }
+            onClick = { viewModel.sendCommand(RemoteButton.BACK) },
+            modifier = Modifier.shadow(3.dp, CircleShape)
         )
 
-        Spacer(Modifier.height(24.dp))
+        Spacer(Modifier.height(28.dp))
 
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
             VerticalRocker(
@@ -343,9 +457,9 @@ private fun TvLikeRemoteLayout(state: RemoteUiState, viewModel: RemoteViewModel)
             )
         }
 
-        Spacer(Modifier.height(24.dp))
+        Spacer(Modifier.height(28.dp))
 
-        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
             ColorKey(Color(0xFFE53935)) { viewModel.sendCommand(RemoteButton.RED) }
             ColorKey(Color(0xFF43A047)) { viewModel.sendCommand(RemoteButton.GREEN) }
             ColorKey(Color(0xFFFDD835)) { viewModel.sendCommand(RemoteButton.YELLOW) }
@@ -397,7 +511,18 @@ private fun TvLikeRemoteLayout(state: RemoteUiState, viewModel: RemoteViewModel)
     }
 }
 
-private fun iconForExtraButton(button: RemoteButton): androidx.compose.ui.graphics.vector.ImageVector = when (button) {
+@Composable
+private fun TintedIconButton(icon: ImageVector, contentDescription: String, tint: Color, onClick: () -> Unit) {
+    RemoteIconButton(
+        icon = icon,
+        contentDescription = contentDescription,
+        onClick = onClick,
+        backgroundColor = tint.copy(alpha = 0.12f),
+        iconTint = tint
+    )
+}
+
+private fun iconForExtraButton(button: RemoteButton): ImageVector = when (button) {
     RemoteButton.SETTINGS -> Icons.Filled.Settings
     RemoteButton.PLAY_PAUSE -> Icons.Filled.PlayArrow
     RemoteButton.STOP -> Icons.Filled.Stop
@@ -417,23 +542,34 @@ private fun digitToButton(digit: Int): RemoteButton = when (digit) {
 private fun DPad(
     onUp: () -> Unit, onDown: () -> Unit, onLeft: () -> Unit, onRight: () -> Unit, onOk: () -> Unit
 ) {
-    Box(modifier = Modifier.size(220.dp), contentAlignment = Alignment.Center) {
+    val primary = MaterialTheme.colorScheme.primary
+    Box(modifier = Modifier.size(228.dp), contentAlignment = Alignment.Center) {
         Box(
             modifier = Modifier
-                .size(220.dp)
+                .size(228.dp)
+                .shadow(10.dp, CircleShape, spotColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.2f))
                 .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.surfaceVariant)
+                .background(
+                    Brush.radialGradient(
+                        colors = listOf(
+                            MaterialTheme.colorScheme.surfaceVariant.lighten(0.4f),
+                            MaterialTheme.colorScheme.surfaceVariant
+                        )
+                    )
+                )
+                .border(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f), CircleShape)
         )
-        RemoteIconButton(Icons.Filled.KeyboardArrowUp, "Yukarı", onUp, modifier = Modifier.align(Alignment.TopCenter).padding(top = 8.dp), backgroundColor = Color.Transparent)
-        RemoteIconButton(Icons.Filled.KeyboardArrowDown, "Aşağı", onDown, modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 8.dp), backgroundColor = Color.Transparent)
-        RemoteIconButton(Icons.Filled.KeyboardArrowLeft, "Sol", onLeft, modifier = Modifier.align(Alignment.CenterStart).padding(start = 8.dp), backgroundColor = Color.Transparent)
-        RemoteIconButton(Icons.Filled.KeyboardArrowRight, "Sağ", onRight, modifier = Modifier.align(Alignment.CenterEnd).padding(end = 8.dp), backgroundColor = Color.Transparent)
+        RemoteIconButton(Icons.Filled.KeyboardArrowUp, "Yukarı", onUp, modifier = Modifier.align(Alignment.TopCenter).padding(top = 10.dp), backgroundColor = Color.Transparent)
+        RemoteIconButton(Icons.Filled.KeyboardArrowDown, "Aşağı", onDown, modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 10.dp), backgroundColor = Color.Transparent)
+        RemoteIconButton(Icons.Filled.KeyboardArrowLeft, "Sol", onLeft, modifier = Modifier.align(Alignment.CenterStart).padding(start = 10.dp), backgroundColor = Color.Transparent)
+        RemoteIconButton(Icons.Filled.KeyboardArrowRight, "Sağ", onRight, modifier = Modifier.align(Alignment.CenterEnd).padding(end = 10.dp), backgroundColor = Color.Transparent)
         RemoteIconButton(
             icon = Icons.Filled.Check,
             contentDescription = "Tamam",
             onClick = onOk,
-            size = 68.dp,
-            backgroundColor = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.shadow(8.dp, CircleShape, spotColor = primary.copy(alpha = 0.6f)),
+            size = 70.dp,
+            containerBrush = Brush.radialGradient(listOf(primary.lighten(0.15f), primary.darken(0.08f))),
             iconTint = Color.White
         )
     }
@@ -444,14 +580,15 @@ private fun VerticalRocker(
     label: String,
     onUp: () -> Unit,
     onDown: () -> Unit,
-    middleIcon: androidx.compose.ui.graphics.vector.ImageVector? = null,
+    middleIcon: ImageVector? = null,
     onMiddleClick: (() -> Unit)? = null
 ) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f))
+        Text(label, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f))
         Spacer(Modifier.height(8.dp))
         Column(
             modifier = Modifier
+                .shadow(6.dp, RoundedCornerShape(28.dp), spotColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.15f))
                 .clip(RoundedCornerShape(28.dp))
                 .background(MaterialTheme.colorScheme.surfaceVariant)
         ) {
@@ -468,14 +605,22 @@ private fun VerticalRocker(
 
 @Composable
 private fun ColorKey(color: Color, onClick: () -> Unit) {
-    RemoteIconButton(
-        icon = Icons.Filled.Circle,
-        contentDescription = "Renkli Tuş",
-        onClick = onClick,
-        size = 36.dp,
-        backgroundColor = color,
-        iconTint = color
-    )
+    Box(
+        modifier = Modifier
+            .shadow(4.dp, CircleShape, spotColor = color.copy(alpha = 0.6f))
+            .clip(CircleShape)
+            .background(Color.White)
+            .padding(2.dp)
+    ) {
+        RemoteIconButton(
+            icon = Icons.Filled.Circle,
+            contentDescription = "Renkli Tuş",
+            onClick = onClick,
+            size = 34.dp,
+            backgroundColor = color,
+            iconTint = color
+        )
+    }
 }
 
 @Composable

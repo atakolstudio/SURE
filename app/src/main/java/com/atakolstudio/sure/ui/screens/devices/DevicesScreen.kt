@@ -8,18 +8,27 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AcUnit
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Album
+import androidx.compose.material.icons.filled.Cast
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.SettingsInputHdmi
+import androidx.compose.material.icons.filled.Speaker
 import androidx.compose.material.icons.filled.Tv
+import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -137,6 +146,19 @@ fun DevicesScreen(
     }
 }
 
+private fun iconForDeviceType(deviceType: String): ImageVector = when (
+    runCatching { DeviceType.valueOf(deviceType) }.getOrDefault(DeviceType.TV)
+) {
+    DeviceType.TV -> Icons.Filled.Tv
+    DeviceType.AC -> Icons.Filled.AcUnit
+    DeviceType.SET_TOP_BOX -> Icons.Filled.SettingsInputHdmi
+    DeviceType.AV_RECEIVER -> Icons.Filled.Speaker
+    DeviceType.STREAMING_MEDIA -> Icons.Filled.Cast
+    DeviceType.HOME_AUTOMATION -> Icons.Filled.Home
+    DeviceType.DISC_PLAYER -> Icons.Filled.Album
+    DeviceType.PROJECTOR -> Icons.Filled.Videocam
+}
+
 @Composable
 private fun InfoRow(label: String, value: String) {
     Row(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
@@ -184,20 +206,26 @@ private fun DeviceCard(
         onClick = onClick,
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp, pressedElevation = 0.dp),
         modifier = Modifier.fillMaxWidth()
     ) {
         Row(
             modifier = Modifier.padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            val primary = MaterialTheme.colorScheme.primary
             Box(
                 modifier = Modifier
                     .size(52.dp)
                     .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)),
+                    .background(
+                        Brush.linearGradient(
+                            listOf(primary.copy(alpha = 0.22f), primary.copy(alpha = 0.08f))
+                        )
+                    ),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(Icons.Filled.Tv, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                Icon(iconForDeviceType(device.deviceType), contentDescription = null, tint = primary)
             }
             Spacer(Modifier.width(16.dp))
             Column(Modifier.weight(1f)) {
