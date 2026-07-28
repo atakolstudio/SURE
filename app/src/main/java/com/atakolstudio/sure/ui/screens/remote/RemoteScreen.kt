@@ -139,7 +139,12 @@ fun RemoteScreen(
 
             when (state.deviceType) {
                 DeviceType.AC -> AcRemoteLayout(state = state, viewModel = viewModel)
-                else -> TvLikeRemoteLayout(state = state, viewModel = viewModel)
+                DeviceType.TV, DeviceType.SET_TOP_BOX -> TvLikeRemoteLayout(state = state, viewModel = viewModel)
+                DeviceType.AV_RECEIVER -> AvReceiverRemoteLayout(state = state, viewModel = viewModel)
+                DeviceType.STREAMING_MEDIA -> StreamingMediaRemoteLayout(state = state, viewModel = viewModel)
+                DeviceType.DISC_PLAYER -> DiscPlayerRemoteLayout(state = state, viewModel = viewModel)
+                DeviceType.PROJECTOR -> ProjectorRemoteLayout(state = state, viewModel = viewModel)
+                DeviceType.HOME_AUTOMATION -> HomeAutomationRemoteLayout(state = state, viewModel = viewModel)
             }
         }
     }
@@ -511,8 +516,423 @@ private fun TvLikeRemoteLayout(state: RemoteUiState, viewModel: RemoteViewModel)
     }
 }
 
+// =========================================================================
+// AV ALICISI / SES ÇUBUĞU — kanal, renkli tuş ve sayısal tuş takımı YOK;
+// ses kontrolü ve giriş (input) seçimi ön planda.
+// =========================================================================
+
 @Composable
-private fun TintedIconButton(icon: ImageVector, contentDescription: String, tint: Color, onClick: () -> Unit) {
+private fun AvReceiverRemoteLayout(state: RemoteUiState, viewModel: RemoteViewModel) {
+    val scrollState = rememberScrollState()
+    val errorColor = MaterialTheme.colorScheme.error
+
+    Column(
+        modifier = Modifier.fillMaxSize().verticalScroll(scrollState).padding(horizontal = 20.dp, vertical = 16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        RemoteIconButton(
+            icon = Icons.Filled.PowerSettingsNew,
+            contentDescription = "Güç",
+            onClick = { viewModel.sendCommand(RemoteButton.POWER) },
+            modifier = Modifier.shadow(16.dp, CircleShape, spotColor = errorColor.copy(alpha = 0.7f)),
+            size = 78.dp,
+            containerBrush = Brush.radialGradient(listOf(errorColor.lighten(0.15f), errorColor.darken(0.12f))),
+            iconTint = Color.White
+        )
+
+        Spacer(Modifier.height(28.dp))
+
+        // Giriş (kaynak) seçimi — bir AV alıcısında en sık kullanılan tuş
+        Surface(
+            onClick = { viewModel.sendCommand(RemoteButton.INPUT) },
+            shape = RoundedCornerShape(20.dp),
+            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Row(
+                modifier = Modifier.padding(18.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(Icons.Filled.Input, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                Spacer(Modifier.width(12.dp))
+                Text("Giriş / Kaynak Değiştir", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            }
+        }
+
+        Spacer(Modifier.height(32.dp))
+
+        Text("SES SEVİYESİ", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f))
+        Spacer(Modifier.height(12.dp))
+
+        // Büyük, tek merkezi ses kaydırıcısı — bir AV alıcısının asıl işi budur
+        Column(
+            modifier = Modifier
+                .shadow(8.dp, RoundedCornerShape(36.dp), spotColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.15f))
+                .clip(RoundedCornerShape(36.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant)
+                .width(120.dp)
+        ) {
+            RemoteIconButton(Icons.Filled.Add, "Ses Artır", { viewModel.sendCommand(RemoteButton.VOLUME_UP) }, backgroundColor = Color.Transparent, size = 72.dp, repeatable = true)
+            RemoteIconButton(Icons.Filled.VolumeOff, "Sessiz", { viewModel.sendCommand(RemoteButton.MUTE) }, backgroundColor = Color.Transparent, size = 56.dp)
+            RemoteIconButton(Icons.Filled.Remove, "Ses Azalt", { viewModel.sendCommand(RemoteButton.VOLUME_DOWN) }, backgroundColor = Color.Transparent, size = 72.dp, repeatable = true)
+        }
+
+        Spacer(Modifier.height(32.dp))
+
+        Row(horizontalArrangement = Arrangement.spacedBy(28.dp)) {
+            TintedIconButton(Icons.Filled.Menu, "Menü", MaterialTheme.colorScheme.primary) { viewModel.sendCommand(RemoteButton.MENU) }
+            TintedIconButton(Icons.Filled.Settings, "Ayarlar", MaterialTheme.colorScheme.primary) { viewModel.sendCommand(RemoteButton.SETTINGS) }
+        }
+
+        Spacer(Modifier.height(24.dp))
+
+        DPad(
+            onUp = { viewModel.sendCommand(RemoteButton.UP) },
+            onDown = { viewModel.sendCommand(RemoteButton.DOWN) },
+            onLeft = { viewModel.sendCommand(RemoteButton.LEFT) },
+            onRight = { viewModel.sendCommand(RemoteButton.RIGHT) },
+            onOk = { viewModel.sendCommand(RemoteButton.OK) }
+        )
+
+        Spacer(Modifier.height(24.dp))
+    }
+}
+
+// =========================================================================
+// ORTAM YAYINCISI (Chromecast/Fire TV/Apple TV vb.) — kanal, renkli tuş ve
+// sayısal tuş takımı YOK; D-pad + medya oynatma kontrolleri ön planda.
+// =========================================================================
+
+@Composable
+private fun StreamingMediaRemoteLayout(state: RemoteUiState, viewModel: RemoteViewModel) {
+    val scrollState = rememberScrollState()
+    val errorColor = MaterialTheme.colorScheme.error
+
+    Column(
+        modifier = Modifier.fillMaxSize().verticalScroll(scrollState).padding(horizontal = 20.dp, vertical = 16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        RemoteIconButton(
+            icon = Icons.Filled.PowerSettingsNew,
+            contentDescription = "Güç",
+            onClick = { viewModel.sendCommand(RemoteButton.POWER) },
+            modifier = Modifier.shadow(14.dp, CircleShape, spotColor = errorColor.copy(alpha = 0.6f)),
+            size = 68.dp,
+            containerBrush = Brush.radialGradient(listOf(errorColor.lighten(0.15f), errorColor.darken(0.12f))),
+            iconTint = Color.White
+        )
+
+        Spacer(Modifier.height(24.dp))
+
+        Row(horizontalArrangement = Arrangement.spacedBy(28.dp)) {
+            TintedIconButton(Icons.Filled.Home, "Ana Sayfa", MaterialTheme.colorScheme.primary) { viewModel.sendCommand(RemoteButton.HOME) }
+            TintedIconButton(Icons.Filled.Menu, "Menü", MaterialTheme.colorScheme.primary) { viewModel.sendCommand(RemoteButton.MENU) }
+            TintedIconButton(Icons.Filled.Input, "Giriş", MaterialTheme.colorScheme.primary) { viewModel.sendCommand(RemoteButton.INPUT) }
+        }
+
+        Spacer(Modifier.height(28.dp))
+
+        DPad(
+            onUp = { viewModel.sendCommand(RemoteButton.UP) },
+            onDown = { viewModel.sendCommand(RemoteButton.DOWN) },
+            onLeft = { viewModel.sendCommand(RemoteButton.LEFT) },
+            onRight = { viewModel.sendCommand(RemoteButton.RIGHT) },
+            onOk = { viewModel.sendCommand(RemoteButton.OK) }
+        )
+
+        Spacer(Modifier.height(14.dp))
+
+        RemoteIconButton(
+            icon = Icons.Filled.ArrowBackIosNew,
+            contentDescription = "Geri",
+            onClick = { viewModel.sendCommand(RemoteButton.BACK) },
+            modifier = Modifier.shadow(3.dp, CircleShape)
+        )
+
+        Spacer(Modifier.height(32.dp))
+
+        Text("OYNATMA", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f))
+        Spacer(Modifier.height(12.dp))
+
+        Row(horizontalArrangement = Arrangement.spacedBy(20.dp), verticalAlignment = Alignment.CenterVertically) {
+            RemoteIconButton(Icons.Filled.FastRewind, "Geri Sar", { viewModel.sendCommand(RemoteButton.REWIND) }, size = 52.dp)
+            RemoteIconButton(
+                icon = Icons.Filled.PlayArrow,
+                contentDescription = "Oynat/Duraklat",
+                onClick = { viewModel.sendCommand(RemoteButton.PLAY_PAUSE) },
+                modifier = Modifier.shadow(6.dp, CircleShape),
+                size = 68.dp,
+                backgroundColor = MaterialTheme.colorScheme.primary,
+                iconTint = Color.White
+            )
+            RemoteIconButton(Icons.Filled.FastForward, "İleri Sar", { viewModel.sendCommand(RemoteButton.FAST_FORWARD) }, size = 52.dp)
+        }
+
+        Spacer(Modifier.height(32.dp))
+
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
+            VerticalRocker(
+                label = "SES",
+                onUp = { viewModel.sendCommand(RemoteButton.VOLUME_UP) },
+                onDown = { viewModel.sendCommand(RemoteButton.VOLUME_DOWN) },
+                middleIcon = Icons.Filled.VolumeOff,
+                onMiddleClick = { viewModel.sendCommand(RemoteButton.MUTE) }
+            )
+        }
+
+        Spacer(Modifier.height(24.dp))
+    }
+}
+
+// =========================================================================
+// DİSK OYNATICI (DVD/Blu-ray) — medya oynatma kontrolleri ön planda; kanal ve
+// ses kontrolü yok (genelde TV/AVR üzerinden yönetilir). Sayısal tuş takımı
+// bölüm/parça seçimi için katlanabilir şekilde mevcut.
+// =========================================================================
+
+@Composable
+private fun DiscPlayerRemoteLayout(state: RemoteUiState, viewModel: RemoteViewModel) {
+    var numpadExpanded by remember { mutableStateOf(false) }
+    val scrollState = rememberScrollState()
+    val errorColor = MaterialTheme.colorScheme.error
+
+    Column(
+        modifier = Modifier.fillMaxSize().verticalScroll(scrollState).padding(horizontal = 20.dp, vertical = 16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        RemoteIconButton(
+            icon = Icons.Filled.PowerSettingsNew,
+            contentDescription = "Güç",
+            onClick = { viewModel.sendCommand(RemoteButton.POWER) },
+            modifier = Modifier.shadow(14.dp, CircleShape, spotColor = errorColor.copy(alpha = 0.6f)),
+            size = 68.dp,
+            containerBrush = Brush.radialGradient(listOf(errorColor.lighten(0.15f), errorColor.darken(0.12f))),
+            iconTint = Color.White
+        )
+
+        Spacer(Modifier.height(24.dp))
+
+        Row(horizontalArrangement = Arrangement.spacedBy(28.dp)) {
+            TintedIconButton(Icons.Filled.Menu, "Disk Menüsü", MaterialTheme.colorScheme.primary) { viewModel.sendCommand(RemoteButton.MENU) }
+            TintedIconButton(Icons.Filled.Home, "Üst Menü", MaterialTheme.colorScheme.primary) { viewModel.sendCommand(RemoteButton.HOME) }
+        }
+
+        Spacer(Modifier.height(28.dp))
+
+        DPad(
+            onUp = { viewModel.sendCommand(RemoteButton.UP) },
+            onDown = { viewModel.sendCommand(RemoteButton.DOWN) },
+            onLeft = { viewModel.sendCommand(RemoteButton.LEFT) },
+            onRight = { viewModel.sendCommand(RemoteButton.RIGHT) },
+            onOk = { viewModel.sendCommand(RemoteButton.OK) }
+        )
+
+        Spacer(Modifier.height(14.dp))
+
+        RemoteIconButton(
+            icon = Icons.Filled.ArrowBackIosNew,
+            contentDescription = "Geri",
+            onClick = { viewModel.sendCommand(RemoteButton.BACK) },
+            modifier = Modifier.shadow(3.dp, CircleShape)
+        )
+
+        Spacer(Modifier.height(32.dp))
+
+        Text("OYNATMA", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f))
+        Spacer(Modifier.height(12.dp))
+
+        Row(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
+            RemoteIconButton(Icons.Filled.FastRewind, "Geri Sar", { viewModel.sendCommand(RemoteButton.REWIND) }, size = 52.dp)
+            RemoteIconButton(
+                icon = Icons.Filled.PlayArrow,
+                contentDescription = "Oynat/Duraklat",
+                onClick = { viewModel.sendCommand(RemoteButton.PLAY_PAUSE) },
+                modifier = Modifier.shadow(6.dp, CircleShape),
+                size = 64.dp,
+                backgroundColor = MaterialTheme.colorScheme.primary,
+                iconTint = Color.White
+            )
+            RemoteIconButton(Icons.Filled.Stop, "Durdur", { viewModel.sendCommand(RemoteButton.STOP) }, size = 52.dp)
+            RemoteIconButton(Icons.Filled.FastForward, "İleri Sar", { viewModel.sendCommand(RemoteButton.FAST_FORWARD) }, size = 52.dp)
+        }
+
+        Spacer(Modifier.height(28.dp))
+
+        TextButton(onClick = { numpadExpanded = !numpadExpanded }) {
+            Text(if (numpadExpanded) "Bölüm/Parça Tuşlarını Gizle" else "Bölüm/Parça Tuşlarını Göster")
+            Icon(
+                imageVector = if (numpadExpanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                contentDescription = null
+            )
+        }
+        AnimatedVisibility(visible = numpadExpanded, enter = expandVertically(), exit = shrinkVertically()) {
+            NumPad(onDigit = { digit -> viewModel.sendCommand(digitToButton(digit)) })
+        }
+
+        Spacer(Modifier.height(24.dp))
+    }
+}
+
+// =========================================================================
+// PROJEKTÖR — kanal, ses, renkli tuş ve sayısal tuş takımı YOK; giriş (kaynak)
+// seçimi ve menü gezinmesi ön planda.
+// =========================================================================
+
+@Composable
+private fun ProjectorRemoteLayout(state: RemoteUiState, viewModel: RemoteViewModel) {
+    val scrollState = rememberScrollState()
+    val errorColor = MaterialTheme.colorScheme.error
+
+    Column(
+        modifier = Modifier.fillMaxSize().verticalScroll(scrollState).padding(horizontal = 20.dp, vertical = 16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        RemoteIconButton(
+            icon = Icons.Filled.PowerSettingsNew,
+            contentDescription = "Güç",
+            onClick = { viewModel.sendCommand(RemoteButton.POWER) },
+            modifier = Modifier.shadow(16.dp, CircleShape, spotColor = errorColor.copy(alpha = 0.7f)),
+            size = 78.dp,
+            containerBrush = Brush.radialGradient(listOf(errorColor.lighten(0.15f), errorColor.darken(0.12f))),
+            iconTint = Color.White
+        )
+        Spacer(Modifier.height(8.dp))
+        Text(
+            "Projektörler açılış/kapanışta genelde birkaç saniye bekler",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f)
+        )
+
+        Spacer(Modifier.height(28.dp))
+
+        Surface(
+            onClick = { viewModel.sendCommand(RemoteButton.INPUT) },
+            shape = RoundedCornerShape(20.dp),
+            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Row(
+                modifier = Modifier.padding(18.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(Icons.Filled.Input, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                Spacer(Modifier.width(12.dp))
+                Text("Giriş / Kaynak Değiştir", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            }
+        }
+
+        Spacer(Modifier.height(28.dp))
+
+        Row(horizontalArrangement = Arrangement.spacedBy(28.dp)) {
+            TintedIconButton(Icons.Filled.Menu, "Menü", MaterialTheme.colorScheme.primary) { viewModel.sendCommand(RemoteButton.MENU) }
+            TintedIconButton(Icons.Filled.Settings, "Ayarlar", MaterialTheme.colorScheme.primary) { viewModel.sendCommand(RemoteButton.SETTINGS) }
+        }
+
+        Spacer(Modifier.height(28.dp))
+
+        DPad(
+            onUp = { viewModel.sendCommand(RemoteButton.UP) },
+            onDown = { viewModel.sendCommand(RemoteButton.DOWN) },
+            onLeft = { viewModel.sendCommand(RemoteButton.LEFT) },
+            onRight = { viewModel.sendCommand(RemoteButton.RIGHT) },
+            onOk = { viewModel.sendCommand(RemoteButton.OK) }
+        )
+
+        Spacer(Modifier.height(14.dp))
+
+        RemoteIconButton(
+            icon = Icons.Filled.ArrowBackIosNew,
+            contentDescription = "Geri",
+            onClick = { viewModel.sendCommand(RemoteButton.BACK) },
+            modifier = Modifier.shadow(3.dp, CircleShape)
+        )
+
+        Spacer(Modifier.height(24.dp))
+    }
+}
+
+// =========================================================================
+// EV OTOMASYONU (fan/ışık/priz vb.) — çok sade: Güç (aç/kapat) + genel
+// artır/azalt (parlaklık, hız vb. cihaza göre değişir). D-pad, kanal, ses,
+// renkli tuş ve sayısal tuş takımı bu cihaz türü için anlamsızdır.
+// =========================================================================
+
+@Composable
+private fun HomeAutomationRemoteLayout(state: RemoteUiState, viewModel: RemoteViewModel) {
+    val errorColor = MaterialTheme.colorScheme.error
+
+    Column(
+        modifier = Modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = 32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        RemoteIconButton(
+            icon = Icons.Filled.PowerSettingsNew,
+            contentDescription = "Aç / Kapat",
+            onClick = { viewModel.sendCommand(RemoteButton.POWER) },
+            modifier = Modifier.shadow(18.dp, CircleShape, spotColor = errorColor.copy(alpha = 0.7f)),
+            size = 96.dp,
+            containerBrush = Brush.radialGradient(listOf(errorColor.lighten(0.15f), errorColor.darken(0.12f))),
+            iconTint = Color.White
+        )
+        Spacer(Modifier.height(12.dp))
+        Text("Aç / Kapat", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+
+        Spacer(Modifier.height(48.dp))
+
+        Text(
+            "SEVİYE (Parlaklık / Hız)",
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
+        )
+        Spacer(Modifier.height(16.dp))
+
+        Row(horizontalArrangement = Arrangement.spacedBy(32.dp)) {
+            RemoteIconButton(
+                icon = Icons.Filled.Remove,
+                contentDescription = "Azalt",
+                onClick = { viewModel.sendCommand(RemoteButton.VOLUME_DOWN) },
+                modifier = Modifier.shadow(6.dp, CircleShape),
+                size = 68.dp,
+                repeatable = true
+            )
+            RemoteIconButton(
+                icon = Icons.Filled.Add,
+                contentDescription = "Artır",
+                onClick = { viewModel.sendCommand(RemoteButton.VOLUME_UP) },
+                modifier = Modifier.shadow(6.dp, CircleShape),
+                size = 68.dp,
+                repeatable = true
+            )
+        }
+
+        Spacer(Modifier.height(40.dp))
+
+        Surface(
+            shape = RoundedCornerShape(14.dp),
+            color = MaterialTheme.colorScheme.surfaceVariant,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Row(modifier = Modifier.padding(14.dp)) {
+                Icon(
+                    Icons.Filled.Info,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp).padding(top = 2.dp),
+                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    "Ev otomasyonu cihazları (fan, ışık, priz vb.) çok çeşitlidir; bu " +
+                        "yüzden sade bir arayüz sunulur. Cihazınızda ek fonksiyon tuşları " +
+                        "varsa \"Elle Kod Gir\" ile ekleyebilirsiniz.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                )
+            }
+        }
+    }
+}
     RemoteIconButton(
         icon = icon,
         contentDescription = contentDescription,
