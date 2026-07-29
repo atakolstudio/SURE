@@ -933,6 +933,9 @@ private fun HomeAutomationRemoteLayout(state: RemoteUiState, viewModel: RemoteVi
         }
     }
 }
+
+@Composable
+private fun TintedIconButton(icon: ImageVector, contentDescription: String, tint: Color, onClick: () -> Unit) {
     RemoteIconButton(
         icon = icon,
         contentDescription = contentDescription,
