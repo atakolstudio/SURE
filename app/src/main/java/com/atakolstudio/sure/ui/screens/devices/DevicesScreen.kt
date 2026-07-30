@@ -79,6 +79,12 @@ fun DevicesScreen(
         if (devices.isEmpty()) {
             EmptyDevicesState(modifier = Modifier.padding(padding))
         } else {
+            val grouped = remember(devices) {
+                DeviceType.entries.mapNotNull { type ->
+                    val group = devices.filter { it.deviceType == type.name }
+                    if (group.isEmpty()) null else type to group
+                }
+            }
             LazyColumn(
                 modifier = Modifier
                     .padding(padding)
@@ -86,14 +92,19 @@ fun DevicesScreen(
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                items(devices, key = { it.id }) { device ->
-                    DeviceCard(
-                        device = device,
-                        onClick = { onDeviceClick(device.id) },
-                        onRename = { deviceToRename = device },
-                        onDelete = { deviceToDelete = device },
-                        onInfo = { deviceForInfo = device }
-                    )
+                grouped.forEach { (type, groupDevices) ->
+                    item(key = "header_${type.name}") {
+                        CategoryHeader(type = type, count = groupDevices.size)
+                    }
+                    items(groupDevices, key = { it.id }) { device ->
+                        DeviceCard(
+                            device = device,
+                            onClick = { onDeviceClick(device.id) },
+                            onRename = { deviceToRename = device },
+                            onDelete = { deviceToDelete = device },
+                            onInfo = { deviceForInfo = device }
+                        )
+                    }
                 }
             }
         }
@@ -142,6 +153,34 @@ fun DevicesScreen(
             confirmButton = {
                 TextButton(onClick = { deviceForInfo = null }) { Text("Kapat") }
             }
+        )
+    }
+}
+
+@Composable
+private fun CategoryHeader(type: DeviceType, count: Int) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 2.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            iconForDeviceType(type.name),
+            contentDescription = null,
+            modifier = Modifier.size(18.dp),
+            tint = MaterialTheme.colorScheme.primary
+        )
+        Spacer(Modifier.width(8.dp))
+        Text(
+            type.displayNameTr,
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.85f)
+        )
+        Spacer(Modifier.width(6.dp))
+        Text(
+            "($count)",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f)
         )
     }
 }

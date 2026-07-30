@@ -104,6 +104,18 @@ fun RemoteScreen(
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
             )
+        },
+        bottomBar = {
+            if (state.isNewSetupNotYetSaved) {
+                ConfirmSetupBar(
+                    isSaving = state.isSavingDevice,
+                    onConfirmWorks = { viewModel.confirmDeviceWorks() },
+                    onDiscard = {
+                        viewModel.discardUnsavedSetup()
+                        onBack()
+                    }
+                )
+            }
         }
     ) { padding ->
         if (state.isLoading) {
@@ -145,6 +157,50 @@ fun RemoteScreen(
                 DeviceType.DISC_PLAYER -> DiscPlayerRemoteLayout(state = state, viewModel = viewModel)
                 DeviceType.PROJECTOR -> ProjectorRemoteLayout(state = state, viewModel = viewModel)
                 DeviceType.HOME_AUTOMATION -> HomeAutomationRemoteLayout(state = state, viewModel = viewModel)
+            }
+        }
+    }
+}
+
+/** Bir tuşa basınca sessizce kaydetmek yerine, kullanıcıya kumandanın gerçekten
+ *  çalışıp çalışmadığını sorar — IR tek yönlü olduğundan uygulama bunu kendi
+ *  başına bilemez. Sadece kullanıcı "Evet" derse cihaz kaydedilir. */
+@Composable
+private fun ConfirmSetupBar(
+    isSaving: Boolean,
+    onConfirmWorks: () -> Unit,
+    onDiscard: () -> Unit
+) {
+    Surface(
+        shadowElevation = 8.dp,
+        color = MaterialTheme.colorScheme.surface
+    ) {
+        Column(Modifier.padding(16.dp)) {
+            Text(
+                "Yukarıdaki tuşları deneyin — kumandanız cihazınızı kontrol ediyor mu?",
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.SemiBold
+            )
+            Spacer(Modifier.height(10.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                OutlinedButton(
+                    onClick = onDiscard,
+                    modifier = Modifier.weight(1f),
+                    enabled = !isSaving
+                ) {
+                    Text("Hayır, Değiştir")
+                }
+                Button(
+                    onClick = onConfirmWorks,
+                    modifier = Modifier.weight(1f),
+                    enabled = !isSaving
+                ) {
+                    if (isSaving) {
+                        CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp, color = Color.White)
+                    } else {
+                        Text("Evet, Kaydet")
+                    }
+                }
             }
         }
     }

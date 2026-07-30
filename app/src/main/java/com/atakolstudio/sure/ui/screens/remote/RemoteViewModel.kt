@@ -32,7 +32,11 @@ data class RemoteUiState(
     val connectionType: ConnectionType = ConnectionType.TRADITIONAL_IR,
     val hasIrHardware: Boolean = true,
     val lastMessage: String? = null,
+    /** true iken cihaz HENÜZ kaydedilmemiştir; kullanıcı "Evet, çalışıyor" demeden
+     *  otomatik kaydedilmez (IR tek yönlü olduğundan uygulama gerçekten çalışıp
+     *  çalışmadığını kendi başına bilemez — buna kullanıcının karar vermesi gerekir). */
     val isNewSetupNotYetSaved: Boolean = false,
+    val isSavingDevice: Boolean = false,
     // --- Klima (AC) durumu ---
     val acMode: AcMode = AcMode.COOL,
     val acTemperature: Int = 22,
@@ -103,26 +107,43 @@ class RemoteViewModel @Inject constructor(
         )
     }
 
-    /** Kurulum akışında kullanıcı ilk tuşa bastığında cihazı otomatik olarak kaydeder. */
-    private fun persistIfNeeded() {
+    /**
+     * Kullanıcı, kumandanın cihazını GERÇEKTEN kontrol ettiğini kendi gözüyle
+     * doğruladıktan sonra çağrılır ("Evet, Çalışıyor — Kaydet" butonu). IR tek
+     * yönlü bir protokol olduğundan uygulama başarıyı otomatik tespit edemez;
+     * bu yüzden kayıt işlemi kullanıcının onayına bağlıdır — ilk tuşa basılınca
+     * otomatik kaydedilmez.
+     */
+    fun confirmDeviceWorks() {
         val state = _uiState.value
-        if (state.isNewSetupNotYetSaved && state.brand != null) {
-            viewModelScope.launch {
-                val now = System.currentTimeMillis()
-                val id = repository.addDevice(
-                    SavedDeviceEntity(
-                        nickname = state.nickname,
-                        brandKey = state.brand.brandKey,
-                        brandDisplayName = state.brand.displayNameEn,
-                        deviceType = state.deviceType.name,
-                        connectionType = state.connectionType.name,
-                        createdAtEpochMillis = now,
-                        lastUsedEpochMillis = now
-                    )
+        if (!state.isNewSetupNotYetSaved || state.brand == null || state.isSavingDevice) return
+
+        _uiState.value = _uiState.value.copy(isSavingDevice = true)
+        viewModelScope.launch {
+            val now = System.currentTimeMillis()
+            val id = repository.addDevice(
+                SavedDeviceEntity(
+                    nickname = state.nickname,
+                    brandKey = state.brand.brandKey,
+                    brandDisplayName = state.brand.displayNameEn,
+                    deviceType = state.deviceType.name,
+                    connectionType = state.connectionType.name,
+                    createdAtEpochMillis = now,
+                    lastUsedEpochMillis = now
                 )
-                _uiState.value = _uiState.value.copy(savedDeviceId = id, isNewSetupNotYetSaved = false)
-            }
+            )
+            _uiState.value = _uiState.value.copy(
+                savedDeviceId = id,
+                isNewSetupNotYetSaved = false,
+                isSavingDevice = false,
+                lastMessage = "Cihaz kaydedildi"
+            )
         }
+    }
+
+    /** Kumanda çalışmıyorsa: hiçbir şey kaydedilmeden geri dönülür (çağıran taraf onBack() çağırır). */
+    fun discardUnsavedSetup() {
+        _uiState.value = _uiState.value.copy(isNewSetupNotYetSaved = false)
     }
 
     // ------------------------------------------------------------------
@@ -131,7 +152,6 @@ class RemoteViewModel @Inject constructor(
 
     fun sendCommand(button: RemoteButton) {
         val brand = _uiState.value.brand ?: return
-        persistIfNeeded()
 
         if (_uiState.value.connectionType == ConnectionType.SMART_WIFI) {
             _uiState.value = _uiState.value.copy(lastMessage = "WiFi kontrolü yakında eklenecek")
@@ -147,33 +167,28 @@ class RemoteViewModel @Inject constructor(
     // ------------------------------------------------------------------
 
     fun acSetMode(mode: AcMode) {
-        persistIfNeeded()
         _uiState.value = _uiState.value.copy(acMode = mode, acIsOn = true)
         sendCurrentAcState()
     }
 
     fun acIncreaseTemperature() {
-        persistIfNeeded()
         val newTemp = (_uiState.value.acTemperature + 1).coerceIn(acTemperatureRange)
         _uiState.value = _uiState.value.copy(acTemperature = newTemp, acIsOn = true)
         sendCurrentAcState()
     }
 
     fun acDecreaseTemperature() {
-        persistIfNeeded()
         val newTemp = (_uiState.value.acTemperature - 1).coerceIn(acTemperatureRange)
         _uiState.value = _uiState.value.copy(acTemperature = newTemp, acIsOn = true)
         sendCurrentAcState()
     }
 
     fun acSetFanSpeed(speed: AcFanSpeed) {
-        persistIfNeeded()
         _uiState.value = _uiState.value.copy(acFanSpeed = speed, acIsOn = true)
         sendCurrentAcState()
     }
 
     fun acPowerOff() {
-        persistIfNeeded()
         _uiState.value = _uiState.value.copy(acIsOn = false)
         val code = acCodeLibrary.codeForOff()
         val result = if (code == null) {

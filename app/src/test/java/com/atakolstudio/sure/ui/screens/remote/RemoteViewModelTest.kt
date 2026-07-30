@@ -85,14 +85,62 @@ class RemoteViewModelTest {
     }
 
     @Test
-    fun `ilk komut gonderiminde cihaz otomatik olarak kaydedilir`() = runTest(mainDispatcherRule.testDispatcher) {
+    fun `sendCommand cagrilsa bile kullanici onaylamadan cihaz kaydedilmez`() = runTest(mainDispatcherRule.testDispatcher) {
         val viewModel = createViewModel(brandKey = "samsung")
         viewModel.sendCommand(RemoteButton.POWER)
         advanceUntilIdle()
 
+        // IR tek yönlü olduğundan, uygulama tuşa basılmasından "çalıştığını" anlayamaz;
+        // kullanıcı açıkça onaylamadan hiçbir şey kaydedilmemelidir.
+        assertThat(repository.currentDevices).isEmpty()
+        assertThat(viewModel.uiState.value.isNewSetupNotYetSaved).isTrue()
+        assertThat(viewModel.uiState.value.savedDeviceId).isNull()
+    }
+
+    @Test
+    fun `confirmDeviceWorks cagrilinca cihaz kaydedilir`() = runTest(mainDispatcherRule.testDispatcher) {
+        val viewModel = createViewModel(brandKey = "samsung")
+        viewModel.sendCommand(RemoteButton.POWER)
+
+        viewModel.confirmDeviceWorks()
+        advanceUntilIdle()
+
         assertThat(repository.currentDevices).hasSize(1)
+        assertThat(repository.currentDevices.first().brandKey).isEqualTo("samsung")
         assertThat(viewModel.uiState.value.isNewSetupNotYetSaved).isFalse()
         assertThat(viewModel.uiState.value.savedDeviceId).isNotNull()
+    }
+
+    @Test
+    fun `discardUnsavedSetup hicbir sey kaydetmeden kurulum bayragini temizler`() = runTest(mainDispatcherRule.testDispatcher) {
+        val viewModel = createViewModel(brandKey = "samsung")
+        viewModel.sendCommand(RemoteButton.POWER)
+
+        viewModel.discardUnsavedSetup()
+        advanceUntilIdle()
+
+        assertThat(repository.currentDevices).isEmpty()
+        assertThat(viewModel.uiState.value.isNewSetupNotYetSaved).isFalse()
+    }
+
+    @Test
+    fun `kayitli (mevcut) bir cihazda confirmDeviceWorks hicbir sey yapmaz`() = runTest(mainDispatcherRule.testDispatcher) {
+        val now = System.currentTimeMillis()
+        val savedId = repository.addDevice(
+            SavedDeviceEntity(
+                nickname = "Salon TV", brandKey = "lg", brandDisplayName = "LG",
+                deviceType = "TV", connectionType = "TRADITIONAL_IR",
+                createdAtEpochMillis = now, lastUsedEpochMillis = now
+            )
+        )
+        val viewModel = createViewModel(savedDeviceId = savedId, brandKey = null)
+        advanceUntilIdle()
+
+        viewModel.confirmDeviceWorks()
+        advanceUntilIdle()
+
+        // isNewSetupNotYetSaved zaten false olduğundan ikinci bir kayıt oluşturulmamalı
+        assertThat(repository.currentDevices).hasSize(1)
     }
 
     @Test
