@@ -28,6 +28,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -79,24 +80,37 @@ fun DevicesScreen(
         if (devices.isEmpty()) {
             EmptyDevicesState(modifier = Modifier.padding(padding))
         } else {
-            val grouped = remember(devices) {
-                DeviceType.entries.mapNotNull { type ->
-                    val group = devices.filter { it.deviceType == type.name }
-                    if (group.isEmpty()) null else type to group
-                }
+            val presentTypes = remember(devices) {
+                DeviceType.entries.filter { type -> devices.any { it.deviceType == type.name } }
             }
-            LazyColumn(
-                modifier = Modifier
-                    .padding(padding)
-                    .fillMaxSize(),
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                grouped.forEach { (type, groupDevices) ->
-                    item(key = "header_${type.name}") {
-                        CategoryHeader(type = type, count = groupDevices.size)
+            var selectedType by remember(presentTypes) { mutableStateOf(presentTypes.firstOrNull()) }
+            val currentSelection = selectedType ?: presentTypes.firstOrNull()
+
+            Column(Modifier.padding(padding).fillMaxSize()) {
+                ScrollableTabRow(
+                    selectedTabIndex = presentTypes.indexOf(currentSelection).coerceAtLeast(0),
+                    edgePadding = 16.dp,
+                    containerColor = Color.Transparent
+                ) {
+                    presentTypes.forEach { type ->
+                        val count = devices.count { it.deviceType == type.name }
+                        Tab(
+                            selected = type == currentSelection,
+                            onClick = { selectedType = type },
+                            text = { Text("${type.displayNameTr} ($count)") },
+                            icon = { Icon(iconForDeviceType(type.name), contentDescription = null, modifier = Modifier.size(18.dp)) }
+                        )
                     }
-                    items(groupDevices, key = { it.id }) { device ->
+                }
+
+                val devicesInSelectedCategory = devices.filter { it.deviceType == currentSelection?.name }
+
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    items(devicesInSelectedCategory, key = { it.id }) { device ->
                         DeviceCard(
                             device = device,
                             onClick = { onDeviceClick(device.id) },
@@ -153,34 +167,6 @@ fun DevicesScreen(
             confirmButton = {
                 TextButton(onClick = { deviceForInfo = null }) { Text("Kapat") }
             }
-        )
-    }
-}
-
-@Composable
-private fun CategoryHeader(type: DeviceType, count: Int) {
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 2.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(
-            iconForDeviceType(type.name),
-            contentDescription = null,
-            modifier = Modifier.size(18.dp),
-            tint = MaterialTheme.colorScheme.primary
-        )
-        Spacer(Modifier.width(8.dp))
-        Text(
-            type.displayNameTr,
-            style = MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.85f)
-        )
-        Spacer(Modifier.width(6.dp))
-        Text(
-            "($count)",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f)
         )
     }
 }
