@@ -58,4 +58,28 @@ class BrandSelectionViewModelTest {
         val viewModel = BrandSelectionViewModel(SavedStateHandle(emptyMap()))
         assertThat(viewModel.isAcDeviceType).isFalse()
     }
+
+    @Test
+    fun `Disk Oynatici icin marka veritabani gosterilmez (NO_DATABASE_YET)`() {
+        val viewModel = BrandSelectionViewModel(SavedStateHandle(mapOf("deviceType" to "DISC_PLAYER")))
+
+        assertThat(viewModel.screenMode).isEqualTo(BrandScreenMode.NO_DATABASE_YET)
+        assertThat(viewModel.filteredBrands.value).isEmpty()
+    }
+
+    @Test
+    fun `AV Alicisi, Ortam Yayincisi, Projektor ve Ev Otomasyonu icin de marka listesi bos`() {
+        listOf("AV_RECEIVER", "STREAMING_MEDIA", "PROJECTOR", "HOME_AUTOMATION").forEach { type ->
+            val viewModel = BrandSelectionViewModel(SavedStateHandle(mapOf("deviceType" to type)))
+            assertThat(viewModel.screenMode).isEqualTo(BrandScreenMode.NO_DATABASE_YET)
+            assertThat(viewModel.filteredBrands.value).isEmpty()
+        }
+    }
+
+    @Test
+    fun `Set Ustu Kutu icin de tam marka listesi gosterilir (TV ile ayni)`() {
+        val viewModel = BrandSelectionViewModel(SavedStateHandle(mapOf("deviceType" to "SET_TOP_BOX")))
+        assertThat(viewModel.screenMode).isEqualTo(BrandScreenMode.FULL_BRAND_LIST)
+        assertThat(viewModel.filteredBrands.value).isEqualTo(BrandIrDatabase.brands.sortedBy { it.displayNameEn })
+    }
 }

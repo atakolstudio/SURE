@@ -11,6 +11,24 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import javax.inject.Inject
 
+/**
+ * Marka Seçimi ekranının hangi modda çalışacağını belirler. Gerçek IR kod
+ * veritabanımız (BrandIrDatabase) yalnızca TV'ler için kapsamlıdır; bu yüzden
+ * her cihaz türü için AYNI TV marka listesini göstermek yanıltıcıdır (kullanıcı
+ * "Disk Oynatıcı" seçse de "Samsung TV" kodlarını görüyor olurdu).
+ */
+enum class BrandScreenMode {
+    /** TV ve Set Üstü Kutu: kapsamlı, gerçek marka veritabanı gösterilir. */
+    FULL_BRAND_LIST,
+    /** Klima: ayrı bir kod modeli (tam durum) kullandığından tek bir jenerik profil sunulur. */
+    AC_GENERIC_ONLY,
+    /** AV Alıcısı, Ortam Yayıncısı, Disk Oynatıcı, Projektör, Ev Otomasyonu: bu
+     *  kategoriler için henüz özel bir marka veritabanı yok. Yanıltıcı bir TV
+     *  listesi göstermek yerine, kullanıcı doğrudan Kod Tarama / Elle Kod Gir'e
+     *  yönlendirilir. */
+    NO_DATABASE_YET
+}
+
 @HiltViewModel
 class BrandSelectionViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle
@@ -20,12 +38,20 @@ class BrandSelectionViewModel @Inject constructor(
         DeviceType.valueOf(savedStateHandle.get<String>("deviceType") ?: "TV")
     }.getOrDefault(DeviceType.TV)
 
-    /** Klima için ayrı, gerçek IR veritabanı henüz olmadığından tek bir jenerik profil sunulur. */
-    val isAcDeviceType: Boolean = deviceType == DeviceType.AC
+    val screenMode: BrandScreenMode = when (deviceType) {
+        DeviceType.TV, DeviceType.SET_TOP_BOX -> BrandScreenMode.FULL_BRAND_LIST
+        DeviceType.AC -> BrandScreenMode.AC_GENERIC_ONLY
+        else -> BrandScreenMode.NO_DATABASE_YET
+    }
 
-    private val allBrands: List<BrandIrCodeSet> =
-        if (isAcDeviceType) listOf(BrandIrDatabase.GENERIC_AC_PLACEHOLDER)
-        else BrandIrDatabase.brands.sortedBy { it.displayNameEn }
+    /** Geriye dönük uyumluluk için: sadece AC modunu ayırt etmek isteyen çağıranlar için. */
+    val isAcDeviceType: Boolean get() = screenMode == BrandScreenMode.AC_GENERIC_ONLY
+
+    private val allBrands: List<BrandIrCodeSet> = when (screenMode) {
+        BrandScreenMode.AC_GENERIC_ONLY -> listOf(BrandIrDatabase.GENERIC_AC_PLACEHOLDER)
+        BrandScreenMode.FULL_BRAND_LIST -> BrandIrDatabase.brands.sortedBy { it.displayNameEn }
+        BrandScreenMode.NO_DATABASE_YET -> emptyList()
+    }
 
     private val _query = MutableStateFlow("")
     val query: StateFlow<String> = _query.asStateFlow()
