@@ -27,6 +27,18 @@ private fun iconFor(type: DeviceType): ImageVector = when (type) {
     DeviceType.PROJECTOR -> Icons.Filled.Videocam
 }
 
+/**
+ * Gerçek, isimli marka kod veritabanımız şu an yalnızca TV ve Set Üstü Kutu için
+ * kapsamlıdır. Diğer kategorilerde kullanıcıyı "Kod Tarama / Elle Kod Gir"
+ * akışına yönlendiriyoruz (bkz. BrandSelectionViewModel.BrandScreenMode).
+ * Bu bilgiyi burada önceden göstermek, kullanıcının kategoriye girene kadar
+ * yanlış beklentiye kapılmasını önler.
+ */
+private fun hasFullBrandDatabase(type: DeviceType): Boolean = when (type) {
+    DeviceType.TV, DeviceType.SET_TOP_BOX -> true
+    else -> false
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DeviceTypeSelectionScreen(
@@ -52,7 +64,7 @@ fun DeviceTypeSelectionScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp),
             modifier = Modifier.padding(padding).fillMaxSize()
         ) {
-            items(DeviceType.values().toList()) { type ->
+            items(DeviceType.entries.toList()) { type ->
                 DeviceTypeCard(type = type, onClick = { onTypeSelected(type) })
             }
         }
@@ -61,11 +73,12 @@ fun DeviceTypeSelectionScreen(
 
 @Composable
 private fun DeviceTypeCard(type: DeviceType, onClick: () -> Unit) {
+    val fullDatabase = hasFullBrandDatabase(type)
     Surface(
         onClick = onClick,
         shape = RoundedCornerShape(20.dp),
         color = MaterialTheme.colorScheme.surfaceVariant,
-        modifier = Modifier.fillMaxWidth().height(120.dp)
+        modifier = Modifier.fillMaxWidth().height(128.dp)
     ) {
         Column(
             modifier = Modifier.fillMaxSize().padding(16.dp),
@@ -80,6 +93,15 @@ private fun DeviceTypeCard(type: DeviceType, onClick: () -> Unit) {
             )
             Spacer(Modifier.height(8.dp))
             Text(type.displayNameTr, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Spacer(Modifier.height(2.dp))
+            Text(
+                if (fullDatabase) "Marka listesi mevcut" else "Kod tarama ile bulunur",
+                style = MaterialTheme.typography.labelSmall,
+                color = if (fullDatabase)
+                    MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)
+                else
+                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+            )
         }
     }
 }

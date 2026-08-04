@@ -203,6 +203,68 @@ büyük markaların kendi özel kodlama algoritmaları) gelecekte ayrı ayrı ek
 gereken, çok daha büyük bir iştir — her marka için ilgili açık kaynak projelerinden
 (ör. IRremoteESP8266) durum-kodlama mantığının okunup uyarlanması gerekir.
 
+## Cihaz Türüne Göre Marka Veritabanı Kapsamı
+
+Gerçek, isimli marka kod veritabanımız (25 marka, gerçek LIRC kaynaklı) şu an
+yalnızca **Televizyon** ve **Set Üstü Kutu** kategorilerinde kapsamlıdır. Diğer
+kategorilerde (AV Alıcısı, Ortam Yayıncısı, Disk Oynatıcı, Projektör, Ev
+Otomasyonu) yanıltıcı bir TV listesi göstermek yerine, kullanıcı doğrudan
+**Kod Tarama / Elle Kod Gir** akışına yönlendirilir — bu, hâlâ 371 gerçek
+LIRC kodu ve elle kod girişini içerdiği için gerçek bir çözüm sunar, sadece
+markaya göre önceden filtrelenmiş bir liste sunmaz. Cihaz Türü Seçimi
+ekranında her kategori kartının altında bu durum ("Marka listesi mevcut" /
+"Kod tarama ile bulunur") açıkça belirtilir.
+
+## İlk Kurulumda Onaylı Kayıt
+
+IR tek yönlü bir protokol olduğundan, uygulama bir kumandanın gerçekten işe
+yarayıp yaramadığını kendi başına asla bilemez. Bu yüzden yeni bir cihaz
+kurulurken **hiçbir tuşa basılınca otomatik kaydedilmez** — ekranın altında
+sabit bir onay çubuğu belirir ("Kumandanız cihazınızı kontrol ediyor mu?") ve
+yalnızca kullanıcı "Evet, Kaydet" derse `RemoteViewModel.confirmDeviceWorks()`
+çağrılıp cihaz veritabanına yazılır. "Hayır, Değiştir" seçilirse hiçbir kayıt
+oluşturulmadan geri dönülür.
+
+## Cihazlarım Ekranı — Kategoriye Göre Sekmeler
+
+`DevicesScreen`, tüm cihazları tek bir karışık listede göstermek yerine, her
+cihaz türü için ayrı bir sekme sunar (`ScrollableTabRow`). Sadece cihazı olan
+kategoriler sekme olarak görünür; her sekme yalnızca o kategorinin cihazlarını
+listeler — TV sekmesinde TV'ler, Klima sekmesinde klimalar, birbirine hiç
+karışmaz.
+
+## Proje Mimarisine Genel Bakış
+
+```
+data/
+├── ir/
+│   ├── IrProtocol.kt, IrCodeEncoder.kt   → protokol → darbe dizisi
+│   ├── BrandIrDatabase.kt                → 25 gerçek TV marka kodu + jenerik AC yer tutucu
+│   ├── LircBlindScanLoader.kt            → 371 gerçek LIRC kodu (assets/lirc_blind_scan.json)
+│   ├── AcCodeLibrary.kt                  → jenerik klima tam-durum kodları (assets/generic_ac_codes.json)
+│   ├── BlindScanCandidates.kt            → "Aşırı Tarama" sentetik NEC/Sony taraması
+│   ├── SavedDeviceIrMapper.kt            → SavedDeviceEntity ↔ BrandIrCodeSet dönüşümü
+│   └── IrTransmitter.kt                  → ConsumerIrManager sarmalayıcı
+├── local/                                → Room (SavedDeviceEntity, DAO, DB v2)
+└── repository/                           → DeviceRepository
+
+ui/screens/
+├── devices/          → Cihazlarım (kategori sekmeleri)
+├── devicetype/        → Cihaz Türü Seçimi (marka veritabanı durumu gösterilir)
+├── connectiontype/    → IR / WiFi seçimi
+├── brand/              → Marka Seçimi (TV/STB: tam liste, AC: jenerik, diğerleri: Kod Tarama'ya yönlendirme)
+├── manualsearch/      → Kod Tarama (Standart/Kör/Aşırı) + Elle Kod Gir
+└── remote/             → Cihaz türüne özel kumanda arayüzleri (TV, AC, AVR, Ortam Yayıncısı, Disk Oynatıcı, Projektör, Ev Otomasyonu)
+```
+
+## Test Paketi
+
+Proje, MockK + Robolectric + Truth + kotlinx-coroutines-test ile kurulmuş
+kapsamlı bir birim test paketine sahiptir (`app/src/test/`): IR kodlayıcı
+doğruluğu, veritabanı bütünlüğü, ViewModel durum yönetimi. CI, her push'ta
+önce testleri, sonra derlemeyi çalıştırır (`.github/workflows/android-build.yml`).
+Ayrıca `app/src/androidTest/` altında enstrümante Compose UI testleri de vardır.
+
 ## İzinler
 
 | İzin | Amaç |

@@ -9,8 +9,9 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
 
-    <!-- Uzaktan kumanda ekranı açıkken telefonun kararmasını engellemek için -->
-    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <!-- Uzaktan kumanda ekranı açıkken telefonun kararmasını engellemek için
+         View.keepScreenOn kullanılır — bu, WAKE_LOCK iznine ihtiyaç duymaz
+         (o izin yalnızca PowerManager.WakeLock için gereklidir). -->
 
     <!-- Cihazın IR blaster donanımı olmasa da uygulamanın kurulabilmesi için false -->
     <uses-feature
